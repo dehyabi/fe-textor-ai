@@ -63,12 +63,17 @@ export default function Home() {
     error: 0
   });
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
+  const recordingStartTimeRef = useRef<number | null>(null);
+  const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (showHistory && !isLoadingHistory) {
@@ -134,6 +139,31 @@ export default function Home() {
     };
   }, [showHistory]);
 
+  useEffect(() => {
+    if (audioRef.current) {
+      console.log('Audio states:', {
+        currentTime,
+        duration,
+        isPlaying,
+        audioPreview: !!audioPreview
+      });
+    }
+  }, [currentTime, duration, isPlaying, audioPreview]);
+
+  useEffect(() => {
+    return () => {
+      if (audioPreview) {
+        URL.revokeObjectURL(audioPreview);
+      }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+      if (chunksRef.current) {
+        chunksRef.current = [];
+      }
+    };
+  }, []);
+
   const loadTranscriptionHistory = async () => {
     if (isLoadingHistory) return;
     
@@ -197,6 +227,13 @@ export default function Home() {
       setAudioPreview(audioUrl);
       setError(null);
       
+      // Create a temporary audio element to get duration
+      const tempAudio = new Audio(audioUrl);
+      tempAudio.addEventListener('loadedmetadata', () => {
+        setDuration(tempAudio.duration);
+        setCurrentTime(0);
+      });
+      
       setUploadProgress(0);
     } catch (error: any) {
       console.error('Error processing audio file:', error);
@@ -213,6 +250,8 @@ export default function Home() {
   const startRecording = async () => {
     try {
       setError(null);
+      setCurrentTime(0);
+      setDuration(0);
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           channelCount: 1,
@@ -237,27 +276,120 @@ export default function Home() {
       };
 
       mediaRecorderRef.current.onstop = async () => {
-        const audioBlob = new Blob(chunksRef.current, { type: mimeType });
-        console.log('Recording completed:', {
-          type: audioBlob.type,
-          size: audioBlob.size,
-          chunks: chunksRef.current.length
-        });
-        
-        const audioUrl = URL.createObjectURL(audioBlob);
-        setAudioPreview(audioUrl);
-        
-        stream.getTracks().forEach(track => track.stop());
-        setIsLoading(false);
+        try {
+          const audioBlob = new Blob(chunksRef.current, { type: mimeType });
+          console.log('Recording completed:', {
+            type: audioBlob.type,
+            size: audioBlob.size,
+            chunks: chunksRef.current.length
+          });
+          
+          // Convert WebM to WAV for better compatibility
+          const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const arrayBuffer = await audioBlob.arrayBuffer();
+          const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+          
+          // Create WAV file
+          const wavBlob = await new Promise<Blob>((resolve) => {
+            const numberOfChannels = audioBuffer.numberOfChannels;
+            const length = audioBuffer.length;
+            const sampleRate = audioBuffer.sampleRate;
+            const wavBuffer = new ArrayBuffer(44 + length * 2);
+            const view = new DataView(wavBuffer);
+            
+            // Write WAV header
+            const writeString = (view: DataView, offset: number, string: string) => {
+              for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+              }
+            };
+
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, 36 + length * 2, true);
+            writeString(view, 8, 'WAVE');
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);
+            view.setUint16(22, numberOfChannels, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 4, true);
+            view.setUint16(32, numberOfChannels * 2, true);
+            view.setUint16(34, 16, true);
+            writeString(view, 36, 'data');
+            view.setUint32(40, length * 2, true);
+
+            const channel = audioBuffer.getChannelData(0);
+            let offset = 44;
+            for (let i = 0; i < length; i++) {
+              const sample = Math.max(-1, Math.min(1, channel[i]));
+              view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+              offset += 2;
+            }
+
+            resolve(new Blob([wavBuffer], { type: 'audio/wav' }));
+          });
+
+          const audioUrl = URL.createObjectURL(wavBlob);
+          setAudioPreview(audioUrl);
+          setDuration(audioBuffer.duration);
+          setCurrentTime(0);
+          
+          stream.getTracks().forEach(track => track.stop());
+          setIsLoading(false);
+          stopRecordingTimer();
+          
+          // Ensure audio element is properly updated
+          if (audioRef.current) {
+            audioRef.current.src = audioUrl;
+            audioRef.current.load();
+          }
+          
+          console.log('Audio processed:', {
+            duration: audioBuffer.duration,
+            sampleRate: audioBuffer.sampleRate,
+            numberOfChannels: audioBuffer.numberOfChannels
+          });
+        } catch (error) {
+          console.error('Error processing audio:', error);
+          setError('Failed to process audio recording. Please try again.');
+        }
       };
 
       mediaRecorderRef.current.start(1000);
       setIsRecording(true);
       setTranscription('');
+      startRecordingTimer();
     } catch (error: any) {
       console.error('Error accessing microphone:', error);
       setError('Failed to access microphone. Please make sure you have granted microphone permissions.');
     }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      setIsLoading(true);
+    }
+  };
+
+  const startRecordingTimer = () => {
+    recordingStartTimeRef.current = Date.now();
+    recordingIntervalRef.current = setInterval(() => {
+      if (recordingStartTimeRef.current) {
+        const duration = (Date.now() - recordingStartTimeRef.current) / 1000;
+        setRecordingDuration(duration);
+      }
+    }, 100);
+  };
+
+  const stopRecordingTimer = () => {
+    if (recordingIntervalRef.current) {
+      clearInterval(recordingIntervalRef.current);
+      recordingIntervalRef.current = null;
+    }
+    recordingStartTimeRef.current = null;
+    setRecordingDuration(0);
   };
 
   const handleTranscription = async () => {
@@ -370,11 +502,20 @@ export default function Home() {
     }
   };
 
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      setIsLoading(true);
+  const handleCancelAudio = () => {
+    if (audioPreview) {
+      URL.revokeObjectURL(audioPreview);
+    }
+    setAudioPreview(null);
+    setIsPlaying(false);
+    setCurrentTime(0);
+    setDuration(0);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = '';
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -383,16 +524,63 @@ export default function Home() {
     await loadTranscriptionHistory();
   };
 
-  const toggleAudioPlayback = () => {
-    if (!audioRef.current) return;
-
-    if (isPlaying) {
-      audioRef.current.pause();
-    } else {
-      audioRef.current.play();
+  const handleTimeUpdate = () => {
+    if (audioRef.current) {
+      setCurrentTime(audioRef.current.currentTime);
     }
-    setIsPlaying(!isPlaying);
   };
+
+  const handleLoadedMetadata = () => {
+    if (audioRef.current) {
+      setDuration(audioRef.current.duration);
+      setCurrentTime(0);
+    }
+  };
+
+  const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (audioRef.current && !isRecording) {
+      const bounds = e.currentTarget.getBoundingClientRect();
+      const x = e.clientX - bounds.left;
+      const width = bounds.width;
+      const percentage = x / width;
+      const newTime = percentage * duration;
+      audioRef.current.currentTime = newTime;
+      setCurrentTime(newTime);
+    }
+  };
+
+  const toggleAudioPlayback = () => {
+    if (!audioRef.current || !audioPreview) return;
+
+    try {
+      if (isPlaying) {
+        audioRef.current.pause();
+      } else {
+        // Ensure the audio source is set
+        if (!audioRef.current.src) {
+          audioRef.current.src = audioPreview;
+        }
+        audioRef.current.play().catch(error => {
+          console.error('Error playing audio:', error);
+          setError('Failed to play audio. Please try again.');
+        });
+      }
+      setIsPlaying(!isPlaying);
+    } catch (error) {
+      console.error('Error toggling audio:', error);
+      setError('Failed to control audio playback. Please try again.');
+    }
+  };
+
+  // Effect to update audio source when audioPreview changes
+  useEffect(() => {
+    if (audioRef.current && audioPreview) {
+      audioRef.current.src = audioPreview;
+      audioRef.current.load();
+      setIsPlaying(false);
+      setCurrentTime(0);
+    }
+  }, [audioPreview]);
 
   const copyToClipboard = async () => {
     try {
@@ -433,11 +621,11 @@ export default function Home() {
     }
   };
 
-  const formatDuration = (seconds: number): string => {
-    if (!seconds || isNaN(seconds)) return '0:00';
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = Math.floor(seconds % 60);
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  const formatTime = (time: number) => {
+    if (!isFinite(time) || isNaN(time)) return '0:00';
+    const minutes = Math.floor(time / 60);
+    const seconds = Math.floor(time % 60);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
   const filteredHistory = useMemo(() => {
@@ -541,39 +729,107 @@ export default function Home() {
               </div>
 
               {audioPreview && (
-                <div className="mt-4 p-4 bg-gray-800 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <button
-                      onClick={toggleAudioPlayback}
-                      className="p-2 text-white hover:text-purple-400 transition-colors"
-                    >
-                      {isPlaying ? (
-                        <PauseIcon className="w-6 h-6" />
-                      ) : (
-                        <PlayIcon className="w-6 h-6" />
-                      )}
-                    </button>
+                <div className="mt-4 p-6 bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700/50">
+                  <div className="flex flex-col space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <motion.button
+                          onClick={toggleAudioPlayback}
+                          className={clsx(
+                            "w-10 h-10 rounded-full flex items-center justify-center transition-all",
+                            isPlaying 
+                              ? "bg-purple-500 text-white hover:bg-purple-600" 
+                              : "bg-white/10 text-white hover:bg-white/20"
+                          )}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                        >
+                          {isPlaying ? (
+                            <PauseIcon className="w-5 h-5" />
+                          ) : (
+                            <PlayIcon className="w-5 h-5" />
+                          )}
+                        </motion.button>
+                        <div className="text-sm font-medium text-gray-400 w-20">
+                          {isRecording 
+                            ? formatTime(recordingDuration)
+                            : `${formatTime(currentTime)} / ${formatTime(duration)}`}
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <motion.button
+                          onClick={handleTranscription}
+                          className="px-4 py-2 bg-purple-500 hover:bg-purple-600 rounded-lg text-white transition-colors"
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                        >
+                          Transcribe
+                        </motion.button>
+                        <motion.button
+                          onClick={handleCancelAudio}
+                          className="p-2 text-gray-400 hover:text-red-500 rounded-lg transition-colors"
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                        >
+                          <XMarkIcon className="w-6 h-6" />
+                        </motion.button>
+                      </div>
+                    </div>
+                    
+                    <div className="relative w-full h-2 group">
+                      <div 
+                        className="absolute w-full h-full bg-white/5 rounded-full overflow-hidden cursor-pointer"
+                        onClick={!isRecording ? handleProgressClick : undefined}
+                      >
+                        <motion.div 
+                          className={clsx(
+                            "h-full transform transition-all duration-100",
+                            isRecording 
+                              ? "bg-red-500" 
+                              : "bg-gradient-to-r from-purple-500 to-purple-400"
+                          )}
+                          style={{ 
+                            width: isRecording 
+                              ? '100%' 
+                              : `${duration > 0 ? (currentTime / duration) * 100 : 0}%` 
+                          }}
+                          animate={isRecording ? {
+                            opacity: [0.5, 1, 0.5],
+                            transition: {
+                              repeat: Infinity,
+                              duration: 2,
+                              ease: "linear"
+                            }
+                          } : {}}
+                        >
+                          {!isRecording && duration > 0 && (
+                            <motion.div 
+                              className="absolute top-0 right-0 w-3 h-3 bg-white rounded-full shadow-lg transform translate-x-1/2 -translate-y-1/4 opacity-0 group-hover:opacity-100 transition-opacity"
+                              layoutId="progress-handle"
+                            />
+                          )}
+                        </motion.div>
+                      </div>
+                    </div>
+
                     <audio
                       ref={audioRef}
                       src={audioPreview}
-                      onEnded={() => setIsPlaying(false)}
+                      onTimeUpdate={handleTimeUpdate}
+                      onLoadedMetadata={handleLoadedMetadata}
+                      onEnded={() => {
+                        setIsPlaying(false);
+                        setCurrentTime(0);
+                      }}
                       onPlay={() => setIsPlaying(true)}
                       onPause={() => setIsPlaying(false)}
-                      className="w-full mx-4"
-                      controls
+                      onError={(e) => console.error('Audio error:', e)}
+                      preload="metadata"
+                      className="hidden"
                     />
-                    <motion.button
-                      onClick={handleTranscription}
-                      className="px-4 py-2 bg-purple-500 hover:bg-purple-600 rounded-lg text-white transition-colors"
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                    >
-                      Transcribe
-                    </motion.button>
                   </div>
                 </div>
               )}
-
               <div className="text-sm text-gray-400 mt-4">
                 <p>Record audio or drag and drop an audio file here</p>
                 <p className="mt-1">Supported formats: MP3, WAV, AAC, OGG, FLAC, M4A (max 5MB)</p>
