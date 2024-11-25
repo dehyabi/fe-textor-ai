@@ -62,6 +62,7 @@ export default function Home() {
     completed: 0,
     error: 0
   });
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -785,7 +786,7 @@ export default function Home() {
                       key={item.id}
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      className="p-4 bg-gray-800 rounded-lg flex items-start justify-between group"
+                      className="p-4 bg-gray-800 rounded-lg flex items-start justify-between group relative"
                     >
                       <div className="flex-1">
                         <p className="text-gray-200">{item.text}</p>
@@ -793,23 +794,22 @@ export default function Home() {
                           {new Date(item.created_at).toLocaleString()}
                         </p>
                       </div>
-                      <div className="flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
+                      <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <motion.button
                           onClick={() => {
                             navigator.clipboard.writeText(item.text);
-                            setCopySuccess(true);
-                            setTimeout(() => setCopySuccess(false), 2000);
+                            setCopiedId(item.id);
+                            setTimeout(() => setCopiedId(null), 2000);
                           }}
-                          className="p-2 text-gray-400 hover:text-purple-400 transition-colors"
+                          className={clsx(
+                            "p-2 rounded-lg transition-colors",
+                            copiedId === item.id ? "text-green-500" : "text-gray-400 hover:text-purple-400"
+                          )}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
                         >
                           <ClipboardDocumentIcon className="w-5 h-5" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(item.id)}
-                          className="p-2 text-gray-400 hover:text-red-500 transition-colors"
-                        >
-                          <TrashIcon className="w-5 h-5" />
-                        </button>
+                        </motion.button>
                       </div>
                     </motion.div>
                   ))}
