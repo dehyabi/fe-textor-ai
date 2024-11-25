@@ -8,6 +8,7 @@ export type TranscriptionStatus = 'queued' | 'processing' | 'completed' | 'error
 interface TranscriptionStatusProps {
   status: TranscriptionStatus;
   error?: string;
+  className?: string;
 }
 
 const statusConfig = {
@@ -42,14 +43,14 @@ const statusConfig = {
   },
 };
 
-export default function TranscriptionStatus({ status, error }: TranscriptionStatusProps) {
+export default function TranscriptionStatus({ status, error, className }: TranscriptionStatusProps) {
   const config = statusConfig[status];
 
   return (
     <motion.div
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`flex items-center space-x-2 rounded-lg px-3 py-1.5 ${config.color}`}
+      className={`flex items-center space-x-2 rounded-lg px-3 py-1.5 ${config.color} ${className}`}
     >
       <config.icon />
       <span className="font-medium">{config.text}</span>

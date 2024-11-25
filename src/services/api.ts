@@ -27,7 +27,7 @@ export interface TranscriptionsByStatus {
   error: TranscriptionItem[];
 }
 
-export interface TranscriptionResponse {
+export interface ListTranscriptionResponse {
   count: number;
   next: string | null;
   previous: string | null;
@@ -46,31 +46,17 @@ interface TranscriptionData {
   created_at?: string;
 }
 
-interface TranscriptionHistoryResponse {
-  transcriptions: {
-    queued: TranscriptionData[];
-    processing: TranscriptionData[];
-    completed: TranscriptionData[];
-    error: TranscriptionData[];
-  };
-  status_counts: {
-    queued: number;
-    processing: number;
-    completed: number;
-    error: number;
-  };
+export interface TranscriptionHistoryResponse {
+  transcriptions: TranscriptionsByStatus;
+  status_counts: TranscriptionStatusCounts;
 }
 
-interface TranscriptionResponse {
+export interface SingleTranscriptionResponse {
   id?: string;
   text?: string | null;
   status?: string;
   error?: string;
   transcription_id?: string;
-}
-
-export interface UploadProgressCallback {
-  (progress: number): void;
 }
 
 const api = axios.create({
@@ -102,7 +88,7 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const uploadAudioForTranscription = async (
   audioBlob: Blob,
-  onProgress?: UploadProgressCallback,
+  onProgress?: (progress: number) => void,
   languageCode?: string
 ): Promise<string> => {
   const maxRetries = 3;
@@ -120,7 +106,7 @@ export const uploadAudioForTranscription = async (
         attempt: attempt + 1
       });
 
-      const response = await api.post<TranscriptionResponse>('/api/transcribe/upload/', formData, {
+      const response = await api.post<ListTranscriptionResponse>('/api/transcribe/upload/', formData, {
         headers: {
           'Accept': 'application/json',
         },
@@ -129,7 +115,7 @@ export const uploadAudioForTranscription = async (
             const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
             onProgress(progress);
           }
-        },
+        }
       });
 
       console.log('Upload Response:', {
@@ -138,54 +124,24 @@ export const uploadAudioForTranscription = async (
         headers: response.headers
       });
 
-      if (!response.data) {
-        throw new Error('No response data received from server');
+      // Check if response has transcription data
+      if (!response.data.transcriptions) {
+        throw new Error('Invalid response from server');
       }
 
-      if (response.data.error) {
-        throw new Error(response.data.error);
+      // Return the first transcription ID from any status
+      const allTranscriptions = [
+        ...response.data.transcriptions.queued,
+        ...response.data.transcriptions.processing,
+        ...response.data.transcriptions.completed,
+        ...response.data.transcriptions.error
+      ];
+
+      if (allTranscriptions.length === 0) {
+        throw new Error('No transcription ID returned from server');
       }
 
-      // Get ID from various possible response formats
-      const transcriptionId = response.data.transcription_id || response.data.id;
-      
-      if (transcriptionId) {
-        console.log('Got transcription ID:', {
-          id: transcriptionId,
-          rawId: String(transcriptionId),
-          type: typeof transcriptionId,
-          length: String(transcriptionId).length
-        });
-        return String(transcriptionId); // Ensure we return a string
-      }
-
-      // If we have text directly, it's a direct response
-      if (response.data.text !== undefined) {
-        return 'direct-response';
-      }
-
-      // Extract ID from response URL if available
-      const responseUrl = response.headers?.location || response.request?.responseURL;
-      if (responseUrl) {
-        const urlMatch = responseUrl.match(/\/([^\/]+)\/?$/);
-        if (urlMatch) {
-          const extractedId = urlMatch[1];
-          console.log('Extracted ID from URL:', {
-            id: extractedId,
-            url: responseUrl
-          });
-          return extractedId;
-        }
-      }
-
-      // Log the full response for debugging
-      console.error('Unexpected response format:', {
-        data: response.data,
-        headers: response.headers,
-        url: response.request?.responseURL
-      });
-
-      throw new Error('Could not determine transcription ID from server response');
+      return allTranscriptions[0].id;
 
     } catch (error: any) {
       console.error('Upload Error:', {
@@ -220,10 +176,10 @@ export const uploadAudioForTranscription = async (
   throw new Error('Failed to upload after multiple attempts. Please try again later.');
 };
 
-export const getTranscriptionHistory = async (): Promise<TranscriptionResponse> => {
+export const getTranscriptionHistory = async (): Promise<TranscriptionHistoryResponse> => {
   try {
     console.log('Fetching transcription history...');
-    const response = await api.get<TranscriptionResponse>('/api/transcribe/');
+    const response = await api.get<TranscriptionHistoryResponse>('/api/transcribe/');
     console.log('History response:', response.data);
     return response.data;
   } catch (error: any) {
@@ -232,7 +188,7 @@ export const getTranscriptionHistory = async (): Promise<TranscriptionResponse> 
   }
 };
 
-export const checkTranscriptionStatus = async (id: string): Promise<TranscriptionResponse> => {
+export const checkTranscriptionStatus = async (id: string): Promise<SingleTranscriptionResponse> => {
   if (id === 'direct-response') {
     return { status: 'completed' };
   }

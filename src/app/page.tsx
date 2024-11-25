@@ -15,29 +15,21 @@ import {
   XMarkIcon
 } from '@heroicons/react/24/solid';
 import clsx from 'clsx';
-import { uploadAudioForTranscription, getTranscriptionHistory, checkTranscriptionStatus } from '@/services/api';
+import { 
+  TranscriptionItem, 
+  TranscriptionStatusCounts, 
+  TranscriptionHistoryResponse, 
+  getTranscriptionHistory, 
+  uploadAudioForTranscription, 
+  checkTranscriptionStatus 
+} from '@/services/api';
 import TranscriptionStatus from '@/components/TranscriptionStatus';
 import type { TranscriptionStatus as TranscriptionStatusType } from '@/components/TranscriptionStatus';
-
-interface TranscriptionItem {
-  id: string;
-  text: string;
-  created_at: string;
-  status: 'completed' | 'processing' | 'failed';
-  error?: string;
-}
 
 interface TranscriptionStats {
   characters: number;
   words: number;
   sentences: number;
-}
-
-interface TranscriptionStatusCounts {
-  queued: number;
-  processing: number;
-  completed: number;
-  error: number;
 }
 
 export default function Home() {
@@ -169,7 +161,7 @@ export default function Home() {
     
     try {
       setIsLoadingHistory(true);
-      const response = await getTranscriptionHistory();
+      const response: TranscriptionHistoryResponse = await getTranscriptionHistory();
       
       // Update status counts
       setStatusCounts(response.status_counts);
@@ -1054,9 +1046,11 @@ export default function Home() {
                       <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
                         <motion.button
                           onClick={() => {
-                            navigator.clipboard.writeText(item.text);
-                            setCopiedId(item.id);
-                            setTimeout(() => setCopiedId(null), 2000);
+                            if (item.text) {
+                              navigator.clipboard.writeText(item.text);
+                              setCopiedId(item.id);
+                              setTimeout(() => setCopiedId(null), 2000);
+                            }
                           }}
                           className={clsx(
                             "p-2 rounded-lg transition-colors",
