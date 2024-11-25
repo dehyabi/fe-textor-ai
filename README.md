@@ -48,6 +48,37 @@ ASSEMBLYAI_API_KEY=your_assemblyai_api_key  # Get your API key from assemblyai.c
 npm run dev
 ```
 
+## Deployment to Vercel
+
+1. Install Vercel CLI (optional):
+```bash
+npm i -g vercel
+```
+
+2. Deploy to Vercel:
+
+### Option 1: Using Vercel CLI
+```bash
+vercel
+```
+
+### Option 2: Using Vercel Dashboard
+1. Push your code to GitHub
+2. Go to [Vercel Dashboard](https://vercel.com/dashboard)
+3. Click "New Project"
+4. Import your repository
+5. Configure your Environment Variables:
+   - NEXT_PUBLIC_API_URL
+   - NEXT_PUBLIC_AUTH_TOKEN
+   - ASSEMBLYAI_API_KEY
+6. Click "Deploy"
+
+### Post-Deployment
+- Your app will be automatically built and deployed
+- Vercel will provide you with a production URL
+- Set up a custom domain if needed through the Vercel dashboard
+- Enable automatic deployments for future updates
+
 ## API Endpoints
 
 - `/api/transcribe/upload/` - Upload audio for transcription
