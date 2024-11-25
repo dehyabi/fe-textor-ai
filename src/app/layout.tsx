@@ -7,6 +7,10 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'Textor-AI - Speech to Text - AssemblyAI',
   description: 'A modern speech to text converter using AssemblyAI',
+  icons: {
+    icon: '/textor-ai.png',
+    apple: '/textor-ai.png',
+  },
 }
 
 export default function RootLayout({
@@ -22,5 +26,5 @@ export default function RootLayout({
         </main>
       </body>
     </html>
-  );
+  )
 }

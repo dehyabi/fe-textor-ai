@@ -182,7 +182,8 @@ export default function Home() {
         ...response.transcriptions.error
       ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-      setHistory(allTranscriptions);
+      // Only show completed transcriptions
+      setHistory(allTranscriptions.filter((item: any) => item.status === 'completed'));
     } catch (error) {
       console.error('Error loading history:', error);
       setHistory([]);
@@ -951,9 +952,9 @@ export default function Home() {
                       <h2 className="text-xl font-semibold text-white">Transcription History</h2>
                       <button
                         onClick={() => setShowHistory(false)}
-                        className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+                        className="text-white/50 hover:text-white transition-colors"
                       >
-                        <XMarkIcon className="h-6 w-6 text-gray-400" />
+                        <XMarkIcon className="h-6 w-6" />
                       </button>
                     </div>
                     <div className="px-6 pt-4 border-b border-gray-700">
