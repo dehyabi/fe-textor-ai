@@ -733,7 +733,10 @@ export default function Home() {
         </button>
       </div>
 
-      <div className="relative container mx-auto px-4 py-8 min-h-screen max-w-4xl">
+      <div className={clsx(
+        "relative container mx-auto px-4 max-w-4xl",
+        history.length > 0 ? "py-8" : "pt-8 pb-4"
+      )}>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -931,7 +934,7 @@ export default function Home() {
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="p-6 bg-gray-800 rounded-lg shadow-xl min-h-[200px]"
+                className="p-4 bg-gray-800 rounded-lg shadow-xl min-h-[100px]"
               >
                 {isLoading && (
                   <div className="mt-4 space-y-4">
@@ -997,7 +1000,7 @@ export default function Home() {
                   </motion.div>
                 )}
                 {!transcription && !isLoading && (
-                  <p className="text-gray-400">
+                  <p className="text-gray-400 py-2">
                     Click the microphone button to start speaking or upload an audio file...
                   </p>
                 )}
@@ -1140,7 +1143,10 @@ export default function Home() {
             </AnimatePresence>
 
             {history.length > 0 && (
-              <div className="mt-8 max-w-4xl mx-auto">
+              <div className={clsx(
+                "relative w-full",
+                history.length > 0 ? "mt-4" : "mt-0"
+              )}>
                 <h2 className="text-2xl font-semibold mb-4 text-gray-200">Previous Transcriptions</h2>
                 <div className="space-y-4">
                   {history.map((item) => (
@@ -1184,8 +1190,11 @@ export default function Home() {
         </motion.div>
       </div>
       {/* Credit Footer */}
-      <div className="relative w-full mt-8 max-w-4xl mx-auto">
-        <footer className="text-center text-gray-500 text-sm p-4 bg-white/5 backdrop-blur-sm border-t border-gray-800">
+      <div className={clsx(
+        "relative container mx-auto px-4 max-w-4xl",
+        history.length > 0 ? "mt-4" : "mt-2"
+      )}>
+        <footer className="text-center text-gray-500 text-sm p-4 bg-white/5 backdrop-blur-sm border-t border-gray-800 rounded-lg">
           Built with ❤️ in Indonesia by{' '}
           <a 
             href="https://github.com/dehyabi" 
