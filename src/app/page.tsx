@@ -1044,7 +1044,7 @@ export default function Home() {
                       </div>
                     </div>
                     <div 
-                      className="flex-1 overflow-y-auto"
+                      className="flex-1 overflow-y-auto pb-6"
                       style={{ height: 'calc(100% - 8rem)' }}
                     >
                       {isLoadingHistory ? (
@@ -1092,13 +1092,17 @@ export default function Home() {
                           )}
                         </div>
                       ) : (
-                        <div className="space-y-4">
-                          {filteredHistory.map((item) => (
+                        <div className="space-y-4 px-4 py-4">
+                          {filteredHistory.map((item, index) => (
                             <motion.div
                               key={item.id}
                               initial={{ opacity: 0, y: 20 }}
                               animate={{ opacity: 1, y: 0 }}
-                              className="bg-gray-700 rounded-lg p-4 space-y-2"
+                              className={clsx(
+                                "bg-gray-700 rounded-lg p-4 space-y-2",
+                                index === 0 && "mt-2",
+                                index === filteredHistory.length - 1 && "mb-6"
+                              )}
                             >
                               <div className="flex justify-between items-start">
                                 <div className="flex-1">
