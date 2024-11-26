@@ -720,7 +720,22 @@ export default function Home() {
 
   return (
     <main className="min-h-screen p-4 md:p-8 futuristic-scrollbar">
-      <div className="container mx-auto px-4 py-16 max-w-4xl">
+      <div style={{ position: 'fixed', top: '16px', right: '16px', zIndex: 9999, display: showHistory ? 'none' : 'block' }}>
+        <button
+          onClick={handleHistoryClick}
+          className="flex items-center space-x-2 p-2 md:px-4 md:py-2 bg-gray-800 md:bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+        >
+          <div className="flex md:hidden flex-col gap-1">
+            <div className="w-5 h-0.5 bg-white"></div>
+            <div className="w-5 h-0.5 bg-white"></div>
+            <div className="w-5 h-0.5 bg-white"></div>
+          </div>
+          <ClockIcon className="hidden md:block h-5 w-5" />
+          <span className="hidden md:inline">History</span>
+        </button>
+      </div>
+
+      <div className="relative container mx-auto px-4 py-8 min-h-screen">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -989,23 +1004,6 @@ export default function Home() {
                   </p>
                 )}
               </motion.div>
-            </div>
-
-            <div className="absolute top-4 right-4">
-              <motion.button
-                onClick={handleHistoryClick}
-                className="flex items-center space-x-2 p-2 md:px-4 md:py-2 bg-gray-800 md:bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <div className="flex md:hidden flex-col gap-1">
-                  <div className="w-5 h-0.5 bg-white"></div>
-                  <div className="w-5 h-0.5 bg-white"></div>
-                  <div className="w-5 h-0.5 bg-white"></div>
-                </div>
-                <ClockIcon className="hidden md:block h-5 w-5" />
-                <span className="hidden md:inline">History</span>
-              </motion.button>
             </div>
 
             <AnimatePresence>
