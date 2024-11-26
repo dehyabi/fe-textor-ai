@@ -17,7 +17,9 @@ import {
   FolderIcon,
   ArrowPathIcon,
   DocumentIcon,
-  ExclamationTriangleIcon
+  ExclamationTriangleIcon,
+  ChevronUpIcon,
+  ChevronDownIcon,
 } from '@heroicons/react/24/solid';
 import clsx from 'clsx';
 import { 
@@ -73,6 +75,7 @@ export default function Home() {
   const [keepLanguage, setKeepLanguage] = useState(false);
   const [languageError, setLanguageError] = useState<string>('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [showPreviousTranscriptions, setShowPreviousTranscriptions] = useState(false);
 
   const filteredHistory = useMemo(() => {
     if (!history) return [];
@@ -90,14 +93,6 @@ export default function Home() {
   const hasTranscriptions = useMemo(() => {
     return Object.values(statusCounts).some(count => count > 0);
   }, [statusCounts]);
-
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const dropZoneRef = useRef<HTMLDivElement>(null);
-  const recordingStartTimeRef = useRef<number | null>(null);
-  const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (showHistory) {
@@ -144,6 +139,13 @@ export default function Home() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    // Show previous transcriptions when modal is closed and there are transcriptions
+    if (!showHistory && history && Object.values(history).flat().length > 0) {
+      setShowPreviousTranscriptions(true);
+    }
+  }, [showHistory, history]);
 
   const loadTranscriptionHistory = async () => {
     if (isLoadingHistory) return;
@@ -751,6 +753,14 @@ export default function Home() {
     }
   };
 
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const dropZoneRef = useRef<HTMLDivElement>(null);
+  const recordingStartTimeRef = useRef<number | null>(null);
+  const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
   return (
     <main className="min-h-screen p-4 md:p-8 futuristic-scrollbar">
       <div style={{ position: 'fixed', top: '16px', right: '16px', zIndex: 9999, display: showHistory ? 'none' : 'block' }}>
@@ -979,9 +989,9 @@ export default function Home() {
             <AnimatePresence>
               {error && (
                 <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
                   className="p-4 bg-red-500/10 text-red-500 rounded-lg max-w-4xl mx-auto"
                 >
                   {error}
@@ -1086,7 +1096,10 @@ export default function Home() {
                     <div className="flex justify-between items-center p-6 border-b border-gray-700">
                       <h2 className="text-xl font-semibold text-white">Transcription History</h2>
                       <button
-                        onClick={() => setShowHistory(false)}
+                        onClick={() => {
+                          setShowHistory(false);
+                          setShowPreviousTranscriptions(true);
+                        }}
                         className="text-white/50 hover:text-white transition-colors"
                       >
                         <XMarkIcon className="h-6 w-6" />
@@ -1126,12 +1139,12 @@ export default function Home() {
                           )}
                         </div>
                       ) : (
-                        <div className="space-y-4 px-4 py-4">
+                        <div className="space-y-4">
                           {filteredHistory.map((item) => (
                             <motion.div
                               key={item.id}
-                              initial={{ opacity: 0, y: 20 }}
-                              animate={{ opacity: 1, y: 0 }}
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
                               className={clsx(
                                 "bg-gray-700 rounded-lg p-4 space-y-2",
                                 item === filteredHistory[0] && "mt-2",
@@ -1140,17 +1153,19 @@ export default function Home() {
                             >
                               <div className="flex justify-between items-start">
                                 <div className="flex-1">
-                                  <div className="flex items-center gap-4 text-gray-300 text-sm mb-2">
-                                    <span>Created: {formatDate(item.created_at)}</span>
-                                  </div>
-                                  <p className="text-white break-words">
-                                    {item.text || (item.status === 'processing' ? 'Please wait, transcription is still processing...' : 'No transcription available')}
-                                  </p>
-                                  {item.error && (
-                                    <p className="text-red-400 text-sm mt-2">
-                                      Error: {item.error}
+                                  <div className="flex items-center justify-between relative">
+                                    <p className="text-white break-words">
+                                      {item.text || (item.status === 'processing' ? 'Please wait, transcription is still processing...' : 'No transcription available')}
                                     </p>
-                                  )}
+                                    {item.error && (
+                                      <p className="text-red-400 text-sm mt-2">
+                                        Error: {item.error}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <p className="text-sm text-gray-400 mt-2">
+                                    {new Date(item.created_at).toLocaleString()}
+                                  </p>
                                 </div>
                                 <TranscriptionStatus 
                                   status={item.status} 
@@ -1182,48 +1197,80 @@ export default function Home() {
                 "relative w-full",
                 Object.values(statusCounts).some(count => count > 0) ? "mt-4" : "mt-0"
               )}>
-                <h2 className="text-2xl font-semibold mb-4 text-gray-200">Previous Transcriptions</h2>
-                <div className="space-y-4">
-                  {filteredHistory.map((item) => (
-                    <motion.div
-                      key={item.id}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="p-4 bg-gray-800 rounded-lg flex items-start justify-between group relative hover:bg-gray-700/50 transition-colors"
+                <div className="flex justify-between items-center mb-4 cursor-pointer group"
+                     onClick={() => setShowPreviousTranscriptions(!showPreviousTranscriptions)}>
+                  <div className="flex-1" />
+                  <h2 className="text-2xl font-semibold text-gray-200 flex-1 text-center group-hover:text-white transition-colors">
+                    Previous Transcriptions
+                  </h2>
+                  <div className="flex-1 flex justify-end">
+                    <button
+                      className="text-gray-400 hover:text-white p-1.5 rounded-full bg-gray-700/50 hover:bg-gray-600/50 transition-all transform duration-200 ease-in-out"
                     >
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between relative">
-                          <p className="text-gray-200 flex-1 pr-8">{item.text}</p>
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(item.text);
-                              const el = document.getElementById(`copy-tooltip-main-${item.id}`);
-                              if (el) {
-                                el.style.display = 'block';
-                                setTimeout(() => {
-                                  el.style.display = 'none';
-                                }, 2000);
-                              }
-                            }}
-                            className="absolute right-0 top-0 text-gray-400 hover:text-white transition-all ml-2 p-1 opacity-0 group-hover:opacity-100"
-                            title="Copy to clipboard"
-                          >
-                            <ClipboardDocumentIcon className="h-5 w-5" />
-                            <div 
-                              id={`copy-tooltip-main-${item.id}`}
-                              className="hidden absolute right-0 -top-8 bg-gray-700 text-white text-xs px-2 py-1 rounded"
-                            >
-                              Copied!
-                            </div>
-                          </button>
-                        </div>
-                        <p className="text-sm text-gray-400 mt-2">
-                          {new Date(item.created_at).toLocaleString()}
-                        </p>
-                      </div>
-                    </motion.div>
-                  ))}
+                      {showPreviousTranscriptions ? (
+                        <ChevronUpIcon className="h-5 w-5 transform transition-transform duration-200" />
+                      ) : (
+                        <ChevronDownIcon className="h-5 w-5 transform transition-transform duration-200" />
+                      )}
+                    </button>
+                  </div>
                 </div>
+                {showPreviousTranscriptions && Object.values(history).flat().length > 0 && (
+                  <div className="space-y-4">
+                    {Object.values(history).flat().slice(0, 5).map((item) => (
+                      <motion.div
+                        key={item.id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="p-4 bg-gray-800 rounded-lg flex items-start justify-between group relative hover:bg-gray-700/50 transition-colors"
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between relative">
+                            <p className="text-gray-200 flex-1 pr-8">{item.text}</p>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(item.text);
+                                const el = document.getElementById(`copy-tooltip-main-${item.id}`);
+                                if (el) {
+                                  el.style.display = 'block';
+                                  setTimeout(() => {
+                                    el.style.display = 'none';
+                                  }, 2000);
+                                }
+                              }}
+                              className="absolute right-0 top-0 text-gray-400 hover:text-white transition-all ml-2 p-1 opacity-0 group-hover:opacity-100"
+                              title="Copy to clipboard"
+                            >
+                              <ClipboardDocumentIcon className="h-5 w-5" />
+                              <div 
+                                id={`copy-tooltip-main-${item.id}`}
+                                className="hidden absolute right-0 -top-8 bg-gray-700 text-white text-xs px-2 py-1 rounded"
+                              >
+                                Copied!
+                              </div>
+                            </button>
+                          </div>
+                          <p className="text-sm text-gray-400 mt-2">
+                            {new Date(item.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                      </motion.div>
+                    ))}
+                    {Object.values(history).flat().length > 5 && (
+                      <div className="flex justify-center mt-4">
+                        <button
+                          onClick={() => {
+                            setActiveTab('all');
+                            setShowHistory(true);
+                          }}
+                          className="px-4 py-2 text-sm text-gray-300 hover:text-white bg-gray-700/50 hover:bg-gray-600/50 rounded-full transition-all"
+                        >
+                          View All Transcriptions
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
