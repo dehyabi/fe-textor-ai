@@ -96,9 +96,6 @@ export const uploadAudioForTranscription = async (
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      const formData = new FormData();
-      formData.append('file', audioBlob, 'recording.wav');
-
       console.log('Upload Request:', {
         url: '/api/transcribe/upload/',
         blobType: audioBlob.type,
@@ -106,9 +103,15 @@ export const uploadAudioForTranscription = async (
         attempt: attempt + 1
       });
 
-      const response = await api.post<ListTranscriptionResponse>('/api/transcribe/upload/', formData, {
+      // Create form data with the audio blob
+      const formData = new FormData();
+      const filename = 'recording.' + (audioBlob.type.split('/')[1] || 'wav');
+      formData.append('file', audioBlob, filename);
+      
+      const response = await api.post('/api/transcribe/upload/', formData, {
         headers: {
           'Accept': 'application/json',
+          'Content-Type': 'multipart/form-data',
         },
         onUploadProgress: (progressEvent) => {
           if (onProgress && progressEvent.total) {
@@ -124,24 +127,7 @@ export const uploadAudioForTranscription = async (
         headers: response.headers
       });
 
-      // Check if response has transcription data
-      if (!response.data.transcriptions) {
-        throw new Error('Invalid response from server');
-      }
-
-      // Return the first transcription ID from any status
-      const allTranscriptions = [
-        ...response.data.transcriptions.queued,
-        ...response.data.transcriptions.processing,
-        ...response.data.transcriptions.completed,
-        ...response.data.transcriptions.error
-      ];
-
-      if (allTranscriptions.length === 0) {
-        throw new Error('No transcription ID returned from server');
-      }
-
-      return allTranscriptions[0].id;
+      return 'success';
 
     } catch (error: any) {
       console.error('Upload Error:', {
