@@ -1,155 +1,134 @@
-# Textor-AI
+# Textor-AI: Modern Speech-to-Text Transcription
 
-Textor-AI is a modern web application that converts audio recordings into accurate text transcriptions using advanced speech recognition technology. Built with Next.js, TypeScript, and Tailwind CSS, it offers a seamless and intuitive user experience for audio transcription needs.
+Textor-AI is a modern web application that converts audio recordings into accurate text transcriptions using advanced speech recognition technology. Built with Next.js 14, TypeScript, and Tailwind CSS, it offers a seamless and intuitive user experience for audio transcription needs.
 
-Powered by [AssemblyAI](https://www.assemblyai.com/), a state-of-the-art AI speech recognition platform, Textor-AI delivers highly accurate transcriptions with support for multiple languages and audio formats.
+A powerful Speech-to-Text API built with Django REST Framework and AssemblyAI. Textor-AI provides enterprise-grade transcription capabilities with advanced features like multi-language support, real-time status tracking, and comprehensive transcription management.
 
-## Features
+Transform your voice and audio into text effortlessly using AssemblyAI's powerful speech recognition. Record directly or upload audio files, and let our AI handle the rest. Supports multiple formats and provides instant transcriptions.
 
-- 🎙️ Real-time audio recording
-- 🔄 Automatic audio format conversion (WebM to WAV)
-- 📝 High-accuracy speech-to-text transcription using AssemblyAI
-- 📱 Responsive and modern UI design
-- ⚡ Fast and efficient processing
-- 📊 Transcription history tracking
-- 🔍 Status monitoring for transcription jobs
-- 🌍 Multi-language support (powered by AssemblyAI)
+## 🚀 Demo Links
+- **Live Demo**: [https://textor-ai-dehyabi.vercel.app/](https://textor-ai-dehyabi.vercel.app/)
+- **Frontend Repository**: [https://github.com/dehyabi/fe-textor-ai](https://github.com/dehyabi/fe-textor-ai)
+- **Backend Repository**: [https://github.com/dehyabi/textor-ai](https://github.com/dehyabi/textor-ai)
 
-## Tech Stack
+## 📸 Screenshots
+![Modern Interface](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/qh5nat7zn1c1huzfxkt2.png)
+![Transcription Process](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/nmrmosxphhro57t9idk4.png)
+![Results View](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/mq0361vtjtdekv0rqrog.png)
+![History Modal](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/meso773iq2w5g55z3hbj.png)
+
+## 🛠️ Technical Stack
 
 ### Frontend
-- Next.js with TypeScript
-- Tailwind CSS for styling
-- Framer Motion for animations
-- Heroicons for UI elements
+- **Next.js 14**: Latest React framework for production-grade applications
+- **TypeScript**: For type-safe code and better development experience
+- **TailwindCSS**: For responsive and beautiful styling
+- **Framer Motion**: For fluid animations and transitions
+- **Web Audio API**: For robust audio processing
+- **Axios**: For handling HTTP requests
+- **Vercel**: Cloud hosting platform for frontend deployment
 
 ### Backend
-- Django (hosted on PythonAnywhere)
-- RESTful API architecture
-- AssemblyAI API integration
+- **Django**: Python web framework for building robust backend services
+- **Django REST Framework**: For creating RESTful APIs
+- **AssemblyAI Integration**: Implemented in Django views for audio processing
+- **MySQL**: Database for storing transcription data
+- **PythonAnywhere**: Cloud hosting platform for Django backend deployment
 
-## Environment Setup
+## ✨ Features
 
-1. Clone the repository
+- 🎙️ In-browser audio recording
+- 📁 Drag-and-drop file upload
+- 🔄 Multiple audio format support
+- 🌙 Dark mode design
+- 📊 Real-time transcription progress
+- 📱 Responsive design
+- 📜 Transcription history
+- 🔒 Secure file handling
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Node.js 18+
+- Python 3.8+
+- MySQL
+- AssemblyAI API Key
+
+### Frontend Setup
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/dehyabi/fe-textor-ai.git
+   cd fe-textor-ai
+   ```
+
 2. Install dependencies:
-```bash
-npm install
-```
+   ```bash
+   npm install
+   ```
 
-3. Create a `.env.local` file with the following variables:
-```env
-NEXT_PUBLIC_API_URL=your_api_url
-NEXT_PUBLIC_AUTH_TOKEN=your_auth_token
-ASSEMBLYAI_API_KEY=your_assemblyai_api_key  # Get your API key from assemblyai.com
-```
+3. Create `.env.local` file:
+   ```env
+   NEXT_PUBLIC_API_URL=your_backend_url
+   NEXT_PUBLIC_AUTH_TOKEN=your_auth_token
+   ```
 
 4. Run the development server:
-```bash
-npm run dev
-```
+   ```bash
+   npm run dev
+   ```
 
-## Deployment to Vercel
+### Backend Setup
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/dehyabi/textor-ai.git
+   cd textor-ai
+   ```
 
-1. Install Vercel CLI (optional):
-```bash
-npm i -g vercel
-```
+2. Create and activate virtual environment:
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # Linux/Mac
+   # or
+   .\venv\Scripts\activate  # Windows
+   ```
 
-2. Deploy to Vercel:
+3. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-### Option 1: Using Vercel CLI
-```bash
-vercel
-```
+4. Create `.env` file:
+   ```env
+   ASSEMBLYAI_API_KEY=your_api_key
+   DATABASE_URL=your_mysql_url
+   ```
 
-### Option 2: Using Vercel Dashboard
-1. Push your code to GitHub
-2. Go to [Vercel Dashboard](https://vercel.com/dashboard)
-3. Click "New Project"
-4. Import your repository
-5. Configure your Environment Variables:
-   - NEXT_PUBLIC_API_URL
-   - NEXT_PUBLIC_AUTH_TOKEN
-   - ASSEMBLYAI_API_KEY
-6. Click "Deploy"
+5. Run migrations:
+   ```bash
+   python manage.py migrate
+   ```
 
-### Post-Deployment
-- Your app will be automatically built and deployed
-- Vercel will provide you with a production URL
-- Set up a custom domain if needed through the Vercel dashboard
-- Enable automatic deployments for future updates
+6. Start the server:
+   ```bash
+   python manage.py runserver
+   ```
 
-## API Endpoints
+## 📝 API Endpoints
 
-- `/api/transcribe/upload/` - Upload audio for transcription
-- `/api/transcribe/` - Get transcription history
-- `/api/transcribe/{id}/` - Check transcription status
+- `POST /api/transcribe/upload/`: Upload audio file for transcription
+- `GET /api/transcribe/{transcript_id}/`: Check transcription status
+- `GET /api/transcribe/`: Get transcription history
 
-## File Format Support
+## 🤝 Contributing
 
-Supported through AssemblyAI's API:
-- Audio formats: MP3, WAV, AAC, OGG, FLAC, M4A
-- Maximum file size: 5MB
-- Sample rates: 8kHz - 48kHz
-- Channels: Mono/Stereo
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-## Usage
+## 📄 License
 
-1. Click the record button to start recording audio
-2. Stop recording when finished
-3. Click transcribe to process the audio
-4. View transcription results in the history modal
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Development
+## 🙏 Acknowledgments
 
-```bash
-# Install dependencies
-npm install
-
-# Run development server
-npm run dev
-
-# Build for production
-npm run build
-
-# Start production server
-npm start
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## Acknowledgments
-
-- [AssemblyAI](https://www.assemblyai.com/) - For providing the powerful speech-to-text API
-- [Next.js](https://nextjs.org/) - For the React framework
-- [Tailwind CSS](https://tailwindcss.com/) - For the utility-first CSS framework
-
-## License
-
-MIT License
-
-Copyright (c) 2024
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+- [AssemblyAI](https://www.assemblyai.com/) for their excellent speech-to-text API
+- [Next.js](https://nextjs.org/) team for the amazing framework
+- [Django](https://www.djangoproject.com/) community for the robust backend framework
