@@ -1060,7 +1060,7 @@ export default function Home() {
                         <ArrowDownTrayIcon className="w-5 h-5" />
                       </motion.button>
                     </div>
-                    <p className="text-gray-200 text-left">{transcription}</p>
+                    <p className="text-gray-200 text-center">{transcription}</p>
                     <div className="flex justify-between mt-4 text-sm text-gray-400">
                       <span>{stats.characters} characters</span>
                       <span>{stats.words} words</span>
@@ -1152,9 +1152,9 @@ export default function Home() {
                               )}
                             >
                               <div className="flex justify-between items-start">
-                                <div className="flex-1">
+                                <div className="flex-1 min-w-0"> 
                                   <div className="flex items-center justify-between relative">
-                                    <p className="text-white break-words">
+                                    <p className="text-white break-words line-clamp-3 pr-8 w-full text-center">
                                       {item.text || (item.status === 'processing' ? 'Please wait, transcription is still processing...' : 'No transcription available')}
                                     </p>
                                     {item.error && (
@@ -1163,8 +1163,14 @@ export default function Home() {
                                       </p>
                                     )}
                                   </div>
-                                  <p className="text-sm text-gray-400 mt-2">
-                                    {new Date(item.created_at).toLocaleString()}
+                                  <p className="text-sm text-gray-400 mt-6 flex items-center gap-2 justify-center flex-wrap">
+                                    <span>{new Date(item.created_at).toLocaleString()}</span>
+                                    {item.language_code && (
+                                      <>
+                                        <span>•</span>
+                                        <span>{item.language_code.toUpperCase()}</span>
+                                      </>
+                                    )}
                                   </p>
                                 </div>
                                 <TranscriptionStatus 
@@ -1172,16 +1178,6 @@ export default function Home() {
                                   className="ml-4" 
                                 />
                               </div>
-                              {item.language_code && (
-                                <p className="text-gray-400 text-sm">
-                                  Language: {item.language_code.toUpperCase()}
-                                </p>
-                              )}
-                              {item.audio_url && (
-                                <p className="text-gray-400 text-sm">
-                                  Audio: {new URL(item.audio_url).pathname.split('/').pop()}
-                                </p>
-                              )}
                             </motion.div>
                           ))}
                         </div>
@@ -1205,7 +1201,7 @@ export default function Home() {
                   </h2>
                   <div className="flex-1 flex justify-end">
                     <button
-                      className="text-gray-400 hover:text-white p-1.5 rounded-full bg-gray-700/50 hover:bg-gray-600/50 transition-all transform duration-200 ease-in-out"
+                      className="text-gray-400 hover:text-white p-1.5 rounded-full bg-gray-700/50 hover:bg-gray-600/50 transition-all"
                     >
                       {showPreviousTranscriptions ? (
                         <ChevronUpIcon className="h-5 w-5 transform transition-transform duration-200" />
@@ -1222,36 +1218,46 @@ export default function Home() {
                         key={item.id}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
-                        className="p-4 bg-gray-800 rounded-lg flex items-start justify-between group relative hover:bg-gray-700/50 transition-colors"
+                        className={clsx(
+                          "p-4 bg-gray-800 rounded-lg flex items-start justify-between group relative hover:bg-gray-700/50 transition-colors",
+                          "max-h-40 overflow-hidden"
+                        )}
                       >
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0"> 
                           <div className="flex items-center justify-between relative">
-                            <p className="text-gray-200 flex-1 pr-8">{item.text}</p>
+                            <p className="text-gray-200 flex-1 pr-8 line-clamp-3 text-center">
+                              {item.text}
+                            </p>
                             <button
                               onClick={() => {
                                 navigator.clipboard.writeText(item.text);
-                                const el = document.getElementById(`copy-tooltip-main-${item.id}`);
-                                if (el) {
-                                  el.style.display = 'block';
+                                const tooltip = document.getElementById(`copy-tooltip-${item.id}`);
+                                if (tooltip) {
+                                  tooltip.style.display = 'block';
                                   setTimeout(() => {
-                                    el.style.display = 'none';
+                                    tooltip.style.display = 'none';
                                   }, 2000);
                                 }
                               }}
-                              className="absolute right-0 top-0 text-gray-400 hover:text-white transition-all ml-2 p-1 opacity-0 group-hover:opacity-100"
-                              title="Copy to clipboard"
+                              className="absolute right-0 top-0 p-2 text-gray-400 hover:text-white transition-colors flex items-center gap-2 opacity-0 group-hover:opacity-100"
                             >
-                              <ClipboardDocumentIcon className="h-5 w-5" />
-                              <div 
-                                id={`copy-tooltip-main-${item.id}`}
-                                className="hidden absolute right-0 -top-8 bg-gray-700 text-white text-xs px-2 py-1 rounded"
+                              <div
+                                id={`copy-tooltip-${item.id}`}
+                                className="hidden bg-gray-700 text-white text-sm px-2 py-1 rounded"
                               >
                                 Copied!
                               </div>
+                              <ClipboardDocumentIcon className="h-5 w-5" />
                             </button>
                           </div>
-                          <p className="text-sm text-gray-400 mt-2">
-                            {new Date(item.created_at).toLocaleString()}
+                          <p className="text-sm text-gray-400 mt-6 flex items-center gap-2 justify-center flex-wrap">
+                            <span>{new Date(item.created_at).toLocaleString()}</span>
+                            {item.language_code && (
+                              <>
+                                <span>•</span>
+                                <span>{item.language_code.toUpperCase()}</span>
+                              </>
+                            )}
                           </p>
                         </div>
                       </motion.div>
