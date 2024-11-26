@@ -1023,7 +1023,7 @@ export default function Home() {
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
-                    className="relative w-[calc(100%-2rem)] h-[calc(100%-2rem)] md:w-[60%] md:h-[90vh] bg-gray-800 rounded-xl shadow-2xl z-50 overflow-hidden m-4"
+                    className="relative w-[calc(100%-2rem)] h-[70vh] md:w-[60%] md:h-[70vh] bg-gray-800 rounded-xl shadow-2xl z-50 overflow-hidden m-4"
                   >
                     <div className="flex justify-between items-center p-6 border-b border-gray-700">
                       <h2 className="text-xl font-semibold text-white">Transcription History</h2>
