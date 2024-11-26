@@ -1044,7 +1044,7 @@ export default function Home() {
                         onClick={copyToClipboard}
                         className={clsx(
                           "p-2 rounded-lg transition-colors",
-                          copySuccess ? "text-green-500" : "text-gray-400 hover:text-purple-400"
+                          copySuccess ? "text-green-500" : "text-gray-400 hover:text-purple-400 opacity-0 group-hover:opacity-100"
                         )}
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
@@ -1151,32 +1151,58 @@ export default function Home() {
                                 item === filteredHistory[filteredHistory.length - 1] && "mb-6"
                               )}
                             >
-                              <div className="flex justify-between items-start">
-                                <div className="flex-1 min-w-0"> 
-                                  <div className="flex items-center justify-between relative">
-                                    <p className="text-white break-words line-clamp-3 pr-8 w-full text-center">
-                                      {item.text || (item.status === 'processing' ? 'Please wait, transcription is still processing...' : 'No transcription available')}
-                                    </p>
-                                    {item.error && (
-                                      <p className="text-red-400 text-sm mt-2">
-                                        Error: {item.error}
-                                      </p>
-                                    )}
-                                  </div>
-                                  <p className="text-sm text-gray-400 mt-6 flex items-center gap-2 justify-center flex-wrap">
-                                    <span>{new Date(item.created_at).toLocaleString()}</span>
-                                    {item.language_code && (
-                                      <>
-                                        <span>•</span>
-                                        <span>{item.language_code.toUpperCase()}</span>
-                                      </>
-                                    )}
+                              <div className="flex items-center justify-between relative">
+                                <p className="text-white break-words line-clamp-3 pr-8 w-full text-center">
+                                  {item.text || (item.status === 'processing' ? 'Please wait, transcription is still processing...' : 'No transcription available')}
+                                </p>
+                                {item.error && (
+                                  <p className="text-red-400 text-sm mt-2">
+                                    Error: {item.error}
                                   </p>
+                                )}
+                              </div>
+                              <div className="flex items-center justify-between mt-6">
+                                <div className="flex items-center gap-2 text-sm text-gray-400 flex-wrap">
+                                  <span>{new Date(item.created_at).toLocaleString()}</span>
+                                  {item.language_code && (
+                                    <>
+                                      <span>•</span>
+                                      <span>{item.language_code.toUpperCase()}</span>
+                                    </>
+                                  )}
                                 </div>
-                                <TranscriptionStatus 
-                                  status={item.status} 
-                                  className="ml-4" 
-                                />
+                                <div className="flex items-center gap-2">
+                                  <div className="relative flex items-center gap-2 w-[50px] justify-end">
+                                    <button
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(item.text);
+                                        const tooltip = document.getElementById(`copy-tooltip-${item.id}`);
+                                        const button = document.getElementById(`copy-button-${item.id}`);
+                                        if (tooltip && button) {
+                                          tooltip.style.display = 'block';
+                                          button.style.display = 'none';
+                                          setTimeout(() => {
+                                            tooltip.style.display = 'none';
+                                            button.style.display = 'flex';
+                                          }, 2000);
+                                        }
+                                      }}
+                                      id={`copy-button-${item.id}`}
+                                      className="text-gray-400 hover:text-white transition-colors flex items-center gap-2 opacity-0 group-hover:opacity-100"
+                                    >
+                                      <ClipboardDocumentIcon className="h-5 w-5" />
+                                    </button>
+                                    <div
+                                      id={`copy-tooltip-${item.id}`}
+                                      className="hidden text-sm text-gray-400"
+                                    >
+                                      Copied!
+                                    </div>
+                                  </div>
+                                  <TranscriptionStatus 
+                                    status={item.status}
+                                  />
+                                </div>
                               </div>
                             </motion.div>
                           ))}
@@ -1219,38 +1245,17 @@ export default function Home() {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         className={clsx(
-                          "p-4 bg-gray-800 rounded-lg flex items-start justify-between group relative hover:bg-gray-700/50 transition-colors",
+                          "p-4 bg-gray-800 rounded-lg flex flex-col group relative hover:bg-gray-700/50 transition-colors",
                           "max-h-40 overflow-hidden"
                         )}
                       >
-                        <div className="flex-1 min-w-0"> 
-                          <div className="flex items-center justify-between relative">
-                            <p className="text-gray-200 flex-1 pr-8 line-clamp-3 text-center">
-                              {item.text}
-                            </p>
-                            <button
-                              onClick={() => {
-                                navigator.clipboard.writeText(item.text);
-                                const tooltip = document.getElementById(`copy-tooltip-${item.id}`);
-                                if (tooltip) {
-                                  tooltip.style.display = 'block';
-                                  setTimeout(() => {
-                                    tooltip.style.display = 'none';
-                                  }, 2000);
-                                }
-                              }}
-                              className="absolute right-0 top-0 p-2 text-gray-400 hover:text-white transition-colors flex items-center gap-2 opacity-0 group-hover:opacity-100"
-                            >
-                              <div
-                                id={`copy-tooltip-${item.id}`}
-                                className="hidden bg-gray-700 text-white text-sm px-2 py-1 rounded"
-                              >
-                                Copied!
-                              </div>
-                              <ClipboardDocumentIcon className="h-5 w-5" />
-                            </button>
-                          </div>
-                          <p className="text-sm text-gray-400 mt-6 flex items-center gap-2 justify-center flex-wrap">
+                        <div className="flex items-center justify-between relative">
+                          <p className="text-gray-200 flex-1 pr-8 line-clamp-3">
+                            {item.text}
+                          </p>
+                        </div>
+                        <div className="flex items-center justify-between mt-6">
+                          <div className="flex items-center gap-2 text-sm text-gray-400 flex-wrap">
                             <span>{new Date(item.created_at).toLocaleString()}</span>
                             {item.language_code && (
                               <>
@@ -1258,7 +1263,36 @@ export default function Home() {
                                 <span>{item.language_code.toUpperCase()}</span>
                               </>
                             )}
-                          </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="relative flex items-center gap-2">
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(item.text);
+                                  const tooltip = document.getElementById(`copy-tooltip-${item.id}`);
+                                  const button = document.getElementById(`copy-button-${item.id}`);
+                                  if (tooltip && button) {
+                                    tooltip.style.display = 'block';
+                                    button.style.display = 'none';
+                                    setTimeout(() => {
+                                      tooltip.style.display = 'none';
+                                      button.style.display = 'flex';
+                                    }, 2000);
+                                  }
+                                }}
+                                id={`copy-button-${item.id}`}
+                                className="text-gray-400 hover:text-white transition-colors flex items-center gap-2 opacity-0 group-hover:opacity-100"
+                              >
+                                <ClipboardDocumentIcon className="h-5 w-5" />
+                              </button>
+                              <div
+                                id={`copy-tooltip-${item.id}`}
+                                className="hidden text-sm text-gray-400"
+                              >
+                                Copied!
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </motion.div>
                     ))}
