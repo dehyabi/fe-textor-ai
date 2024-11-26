@@ -82,79 +82,50 @@ export const languages: Language[] = [
 ];
 
 interface LanguageSelectorProps {
-  selectedLanguage: string;
-  onLanguageChange: (code: string) => void;
+  value: string;
+  onChange: (code: string) => void;
   className?: string;
 }
 
-export default function LanguageSelector({ selectedLanguage, onLanguageChange, className = '' }: LanguageSelectorProps) {
+export default function LanguageSelector({ value, onChange, className = '' }: LanguageSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const selected = languages.find(lang => lang.code === selectedLanguage) || languages[0];
-  const containerRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Sort languages alphabetically by name and filter based on search
-  const sortedAndFilteredLanguages = useMemo(() => {
-    const sorted = [...languages].sort((a, b) => a.name.localeCompare(b.name));
-    if (!searchQuery) return sorted;
-    
-    const query = searchQuery.toLowerCase();
-    return sorted.filter(lang => 
-      lang.name.toLowerCase().includes(query) || 
-      lang.nativeName.toLowerCase().includes(query)
+  const selectedLang = useMemo(() => {
+    return languages.find(lang => lang.code === value);
+  }, [value]);
+
+  const filteredLanguages = useMemo(() => {
+    return languages.filter(lang =>
+      lang.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      lang.nativeName.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [searchQuery]);
 
-  // Handle click outside
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
-    }
+    };
 
     document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   return (
-    <div ref={containerRef} className={`relative inline-block ${className}`}>
-      <div className="text-center mb-2 text-gray-400">
-        <span>Select Language</span>
-      </div>
-      <div className="mb-2">
-        <input
-          type="text"
-          placeholder="Search languages..."
-          value={searchQuery}
-          onChange={(e) => {
-            setSearchQuery(e.target.value);
-            if (!isOpen && e.target.value) {
-              setIsOpen(true);
-            }
-          }}
-          onFocus={() => setIsOpen(true)}
-          className="w-full px-3 py-1.5 bg-gray-700 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm placeholder-gray-400"
-          onClick={(e) => e.stopPropagation()}
-        />
-      </div>
+    <div className={`relative w-[300px] ${className}`} ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center justify-between space-x-3 w-64 px-4 py-2.5 bg-purple-600 hover:bg-purple-500 rounded-lg text-white transition-all shadow-lg hover:shadow-purple-500/25"
+        style={{ width: '300px' }}
+        className="px-4 py-2.5 text-center bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors"
       >
-        <div className="flex items-center space-x-2">
-          <span className="text-lg">{selected.nativeName}</span>
-        </div>
-        <svg
-          className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
+        {selectedLang ? (
+          <span className="text-sm">{selectedLang.name} ({selectedLang.nativeName})</span>
+        ) : (
+          <span className="text-sm text-gray-400">Select Language</span>
+        )}
       </button>
 
       {isOpen && (
@@ -162,31 +133,39 @@ export default function LanguageSelector({ selectedLanguage, onLanguageChange, c
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -10 }}
-          className="absolute z-50 w-64 mt-2 bg-gray-800 rounded-lg shadow-lg py-2 border border-gray-700 max-h-64 overflow-y-auto"
-          style={{
-            scrollbarWidth: 'thin',
-            scrollbarColor: '#4B5563 #1F2937'
+          style={{ 
+            position: 'absolute',
+            left: 0,
+            width: '300px'
           }}
+          className="z-50 mt-2 bg-gray-800 rounded-lg shadow-lg overflow-hidden"
         >
-          <div className="mt-1">
-            {sortedAndFilteredLanguages.map((language) => (
+          <div className="p-2">
+            <input
+              type="text"
+              placeholder="Search languages..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-700 text-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+            />
+          </div>
+
+          <div className="max-h-[300px] overflow-y-auto">
+            {filteredLanguages.map((lang) => (
               <button
-                key={language.code}
+                key={lang.code}
                 onClick={() => {
-                  onLanguageChange(language.code);
+                  onChange(lang.code);
                   setIsOpen(false);
                   setSearchQuery('');
                 }}
-                className={`w-full px-4 py-2.5 text-left hover:bg-gray-700 transition-all ${
-                  language.code === selectedLanguage ? 'bg-purple-600 hover:bg-purple-500' : ''
+                className={`w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors text-sm ${
+                  lang.code === value
+                    ? 'bg-purple-600 text-white'
+                    : 'text-gray-300'
                 }`}
               >
-                <div className="flex flex-col">
-                  <span className="font-medium text-base text-white">{language.nativeName}</span>
-                  <span className={`text-sm ${language.code === selectedLanguage ? 'text-purple-200' : 'text-gray-400'}`}>
-                    {language.name}
-                  </span>
-                </div>
+                {lang.name} ({lang.nativeName})
               </button>
             ))}
           </div>

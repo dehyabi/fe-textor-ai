@@ -69,7 +69,8 @@ export default function Home() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [recordingDuration, setRecordingDuration] = useState(0);
-  const [selectedLanguage, setSelectedLanguage] = useState('en');
+  const [selectedLanguage, setSelectedLanguage] = useState<string>('');
+  const [languageError, setLanguageError] = useState<string>('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const filteredHistory = useMemo(() => {
@@ -242,6 +243,12 @@ export default function Home() {
   };
 
   const handleStartTranscription = async () => {
+    if (!selectedLanguage) {
+      setLanguageError('Please select a language before uploading');
+      return;
+    }
+    setLanguageError('');
+    
     if (!selectedFile) {
       setError('Please select an audio file first');
       return;
@@ -256,7 +263,7 @@ export default function Home() {
       console.log('Starting transcription:', {
         originalType: selectedFile.type,
         originalSize: formatFileSize(selectedFile.size),
-        language: selectedLanguage || 'en'
+        language: selectedLanguage
       });
 
       await uploadAudioForTranscription(
@@ -270,6 +277,7 @@ export default function Home() {
       setTranscription('');
       await loadTranscriptionHistory();
       setShowHistory(true); // Show history modal
+      setSelectedLanguage(''); // Reset language selection
     } catch (error: any) {
       console.error('Transcription error:', error);
       setError(error.message || 'Failed to start transcription');
@@ -282,6 +290,8 @@ export default function Home() {
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    setSelectedLanguage(''); // Reset language when new file is selected
+    setLanguageError('');
     await handleFileSelection(file);
   };
 
@@ -291,6 +301,7 @@ export default function Home() {
       setCurrentTime(0);
       setDuration(0);
       setSelectedFile(null); // Clear selected file when starting new recording
+      setSelectedLanguage(''); // Reset language when starting new recording
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           channelCount: 1,
@@ -892,11 +903,19 @@ export default function Home() {
                 <p>Record audio or drag and drop an audio file here</p>
                 <p className="mt-1">Supported formats: MP3, WAV, AAC, OGG, FLAC, M4A (max 5MB)</p>
               </div>
-              <div className="mt-8 flex justify-center">
-                <LanguageSelector
-                  selectedLanguage={selectedLanguage}
-                  onLanguageChange={setSelectedLanguage}
-                />
+              <div className="mt-8 flex flex-col items-center">
+                <div className="flex justify-center w-full">
+                  <LanguageSelector 
+                    value={selectedLanguage} 
+                    onChange={(value) => {
+                      setSelectedLanguage(value);
+                      setLanguageError('');
+                    }} 
+                  />
+                </div>
+                {languageError && (
+                  <p className="text-red-500 text-sm mt-2 text-center">{languageError}</p>
+                )}
               </div>
             </div>
 
