@@ -109,6 +109,16 @@ export default function LanguageSelector({ selectedLanguage, onLanguageChange, c
       <div className="text-center mb-2 text-gray-400">
         <span>Select Language</span>
       </div>
+      <div className="mb-2">
+        <input
+          type="text"
+          placeholder="Search languages..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full px-3 py-1.5 bg-gray-700 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm placeholder-gray-400"
+          onClick={(e) => e.stopPropagation()}
+        />
+      </div>
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center justify-between space-x-3 w-64 px-4 py-2.5 bg-purple-600 hover:bg-purple-500 rounded-lg text-white transition-all shadow-lg hover:shadow-purple-500/25"
@@ -137,16 +147,6 @@ export default function LanguageSelector({ selectedLanguage, onLanguageChange, c
             scrollbarColor: '#4B5563 #1F2937'
           }}
         >
-          <div className="sticky top-0 px-2 py-1 bg-gray-800 border-b border-gray-700">
-            <input
-              type="text"
-              placeholder="Search languages..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-3 py-1.5 bg-gray-700 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm placeholder-gray-400"
-              onClick={(e) => e.stopPropagation()}
-            />
-          </div>
           <div className="mt-1">
             {sortedAndFilteredLanguages.map((language) => (
               <button
