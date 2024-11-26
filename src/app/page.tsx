@@ -723,33 +723,31 @@ export default function Home() {
       <div style={{ position: 'fixed', top: '16px', right: '16px', zIndex: 9999, display: showHistory ? 'none' : 'block' }}>
         <button
           onClick={handleHistoryClick}
-          className="flex items-center space-x-2 p-2 md:px-4 md:py-2 bg-gray-800 md:bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+          className="flex items-center space-x-2 p-2 bg-gray-800 text-white rounded-lg transition-colors hover:bg-gray-700"
         >
-          <div className="flex md:hidden flex-col gap-1">
+          <div className="flex flex-col gap-1">
             <div className="w-5 h-0.5 bg-white"></div>
             <div className="w-5 h-0.5 bg-white"></div>
             <div className="w-5 h-0.5 bg-white"></div>
           </div>
-          <ClockIcon className="hidden md:block h-5 w-5" />
-          <span className="hidden md:inline">History</span>
         </button>
       </div>
 
-      <div className="relative container mx-auto px-4 py-8 min-h-screen">
+      <div className="relative container mx-auto px-4 py-8 min-h-screen max-w-4xl">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center"
+          className="text-center max-w-4xl mx-auto"
         >
           <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-purple-500 text-transparent bg-clip-text">
             Textor-AI
           </h1>
-          <p className="text-gray-400 mb-8 max-w-2xl mx-auto">
+          <p className="text-gray-400 mb-8 max-w-4xl mx-auto">
             Transform your voice and audio into text effortlessly using AssemblyAI's powerful speech recognition. 
             Record directly or upload audio files, and let our AI handle the rest. Supports multiple formats and provides instant transcriptions.
           </p>
           
-          <div className="space-y-8">
+          <div className="space-y-8 max-w-4xl mx-auto">
             <div 
               ref={dropZoneRef}
               className={clsx(
@@ -922,14 +920,14 @@ export default function Home() {
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className="p-4 bg-red-500/10 text-red-500 rounded-lg"
+                  className="p-4 bg-red-500/10 text-red-500 rounded-lg max-w-4xl mx-auto"
                 >
                   {error}
                 </motion.div>
               )}
             </AnimatePresence>
 
-            <div className="relative">
+            <div className="relative max-w-4xl mx-auto">
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -1021,7 +1019,7 @@ export default function Home() {
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
-                    className="relative w-[calc(100%-2rem)] h-[70vh] md:w-[60%] md:h-[70vh] bg-gray-800 rounded-xl shadow-2xl z-50 overflow-hidden m-4"
+                    className="relative w-[calc(100%-2rem)] h-[70vh] md:w-[60%] md:h-[70vh] bg-gray-800 rounded-xl shadow-2xl z-50 overflow-hidden m-4 max-w-4xl mx-auto"
                   >
                     <div className="flex justify-between items-center p-6 border-b border-gray-700">
                       <h2 className="text-xl font-semibold text-white">Transcription History</h2>
@@ -1142,7 +1140,7 @@ export default function Home() {
             </AnimatePresence>
 
             {history.length > 0 && (
-              <div className="mt-8">
+              <div className="mt-8 max-w-4xl mx-auto">
                 <h2 className="text-2xl font-semibold mb-4 text-gray-200">Previous Transcriptions</h2>
                 <div className="space-y-4">
                   {history.map((item) => (
@@ -1186,7 +1184,7 @@ export default function Home() {
         </motion.div>
       </div>
       {/* Credit Footer */}
-      <div className="relative w-full mt-8">
+      <div className="relative w-full mt-8 max-w-4xl mx-auto">
         <footer className="text-center text-gray-500 text-sm p-4 bg-white/5 backdrop-blur-sm border-t border-gray-800">
           Built with ❤️ in Indonesia by{' '}
           <a 
