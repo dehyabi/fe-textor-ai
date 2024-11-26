@@ -83,7 +83,7 @@ export const languages: Language[] = [
 
 interface LanguageSelectorProps {
   value: string;
-  onChange: (code: string) => void;
+  onChange: (value: string) => void;
   className?: string;
 }
 
@@ -118,13 +118,13 @@ export default function LanguageSelector({ value, onChange, className = '' }: La
     <div className={`relative w-[300px] ${className}`} ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        style={{ width: '300px' }}
         className="px-4 py-2.5 text-center bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors"
+        style={{ width: '300px' }}
       >
         {selectedLang ? (
           <span className="text-sm">{selectedLang.name} ({selectedLang.nativeName})</span>
         ) : (
-          <span className="text-sm text-gray-400">Select Language</span>
+          <span className="text-sm text-gray-400">Click to confirm language</span>
         )}
       </button>
 

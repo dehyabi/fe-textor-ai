@@ -70,6 +70,7 @@ export default function Home() {
   const [duration, setDuration] = useState(0);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [selectedLanguage, setSelectedLanguage] = useState<string>('');
+  const [keepLanguage, setKeepLanguage] = useState(false);
   const [languageError, setLanguageError] = useState<string>('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
@@ -277,7 +278,9 @@ export default function Home() {
       setTranscription('');
       await loadTranscriptionHistory();
       setShowHistory(true); // Show history modal
-      setSelectedLanguage(''); // Reset language selection
+      if (!keepLanguage) {
+        setSelectedLanguage('');
+      }
     } catch (error: any) {
       console.error('Transcription error:', error);
       setError(error.message || 'Failed to start transcription');
@@ -290,7 +293,10 @@ export default function Home() {
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    setSelectedLanguage(''); // Reset language when new file is selected
+    
+    if (!keepLanguage) {
+      setSelectedLanguage('');
+    }
     setLanguageError('');
     await handleFileSelection(file);
   };
@@ -300,8 +306,10 @@ export default function Home() {
       setError(null);
       setCurrentTime(0);
       setDuration(0);
-      setSelectedFile(null); // Clear selected file when starting new recording
-      setSelectedLanguage(''); // Reset language when starting new recording
+      setSelectedFile(null);
+      if (!keepLanguage) {
+        setSelectedLanguage('');
+      }
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           channelCount: 1,
@@ -435,7 +443,10 @@ export default function Home() {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
-      setSelectedFile(null); // Clear selected file when stopping recording
+      setSelectedFile(null);
+      if (!keepLanguage) {
+        setSelectedLanguage('');
+      }
       setIsLoading(true);
     }
   };
@@ -712,6 +723,33 @@ export default function Home() {
     );
   };
 
+  const handleUploadComplete = () => {
+    setIsLoading(false);
+    setUploadProgress(0);
+    setSelectedFile(null);
+    if (!keepLanguage) {
+      setSelectedLanguage('');
+    }
+  };
+
+  const handleRecordingComplete = (audioBlob: Blob) => {
+    setIsRecording(false);
+    setSelectedFile(new File([audioBlob], 'recording.wav', { type: 'audio/wav' }));
+    if (!keepLanguage) {
+      setSelectedLanguage('');
+    }
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      if (!keepLanguage) {
+        setSelectedLanguage('');
+      }
+    }
+  };
+
   return (
     <main className="min-h-screen p-4 md:p-8 futuristic-scrollbar">
       <div style={{ position: 'fixed', top: '16px', right: '16px', zIndex: 9999, display: showHistory ? 'none' : 'block' }}>
@@ -904,7 +942,7 @@ export default function Home() {
                 <p className="mt-1">Supported formats: MP3, WAV, AAC, OGG, FLAC, M4A (max 5MB)</p>
               </div>
               <div className="mt-8 flex flex-col items-center">
-                <div className="flex justify-center w-full">
+                <div className="flex justify-center w-full flex-col items-center">
                   <LanguageSelector 
                     value={selectedLanguage} 
                     onChange={(value) => {
@@ -912,6 +950,24 @@ export default function Home() {
                       setLanguageError('');
                     }} 
                   />
+                  {selectedLanguage !== '' && (
+                    <motion.label 
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mt-4 flex items-center space-x-3 cursor-pointer group"
+                    >
+                      <div className="relative">
+                        <input
+                          type="checkbox"
+                          checked={keepLanguage}
+                          onChange={(e) => setKeepLanguage(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-gray-300 after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600 peer-hover:after:scale-95 after:duration-200 group-hover:ring-2 group-hover:ring-purple-400/30 group-hover:ring-offset-2 group-hover:ring-offset-gray-900"></div>
+                      </div>
+                      <span className="text-sm text-gray-300 group-hover:text-purple-400 transition-colors duration-200">Keep language for next transcription</span>
+                    </motion.label>
+                  )}
                 </div>
                 {languageError && (
                   <p className="text-red-500 text-sm mt-2 text-center">{languageError}</p>
