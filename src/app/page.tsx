@@ -131,14 +131,16 @@ export default function Home() {
 
   useEffect(() => {
     if (showHistory) {
+      document.documentElement.style.overflow = 'hidden';
       document.body.style.overflow = 'hidden';
     } else {
-      document.body.style.overflow = 'unset';
+      document.documentElement.style.overflow = '';
+      document.body.style.overflow = '';
     }
     
-    // Cleanup on unmount
     return () => {
-      document.body.style.overflow = 'unset';
+      document.documentElement.style.overflow = '';
+      document.body.style.overflow = '';
     };
   }, [showHistory]);
 
@@ -1008,19 +1010,20 @@ export default function Home() {
 
             <AnimatePresence>
               {showHistory && (
-                <>
+                <div className="fixed inset-0 z-40 flex items-center justify-center" style={{ height: '100dvh' }}>
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-40"
+                    className="fixed inset-0 bg-black/50 backdrop-blur-sm"
+                    style={{ height: '100dvh' }}
                     onClick={() => setShowHistory(false)}
                   />
                   <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
-                    className="fixed inset-x-4 top-20 bottom-20 md:inset-x-auto md:left-1/2 md:w-[60%] md:-ml-[30%] bg-gray-800 rounded-xl shadow-2xl z-50 overflow-hidden"
+                    className="relative w-[calc(100%-2rem)] h-[calc(100%-2rem)] md:w-[60%] md:h-[90vh] bg-gray-800 rounded-xl shadow-2xl z-50 overflow-hidden m-4"
                   >
                     <div className="flex justify-between items-center p-6 border-b border-gray-700">
                       <h2 className="text-xl font-semibold text-white">Transcription History</h2>
@@ -1132,7 +1135,7 @@ export default function Home() {
                       )}
                     </div>
                   </motion.div>
-                </>
+                </div>
               )}
             </AnimatePresence>
 
