@@ -587,6 +587,7 @@ export default function Home() {
 
   const handleHistoryClick = async () => {
     setShowHistory(true);
+    setActiveTab('all');
     await loadTranscriptionHistory();
   };
 
@@ -1129,40 +1130,43 @@ export default function Home() {
                           {filteredHistory.map((item) => (
                             <motion.div
                               key={item.id}
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              className="p-4 bg-gray-800 rounded-lg flex items-start justify-between group relative hover:bg-gray-700/50 transition-colors"
+                              initial={{ opacity: 0, y: 20 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className={clsx(
+                                "bg-gray-700 rounded-lg p-4 space-y-2",
+                                item === filteredHistory[0] && "mt-2",
+                                item === filteredHistory[filteredHistory.length - 1] && "mb-6"
+                              )}
                             >
-                              <div className="flex-1">
-                                <div className="flex items-center justify-between relative">
-                                  <p className="text-gray-200 flex-1 pr-8">{item.text}</p>
-                                  <button
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(item.text);
-                                      const el = document.getElementById(`copy-tooltip-main-${item.id}`);
-                                      if (el) {
-                                        el.style.display = 'block';
-                                        setTimeout(() => {
-                                          el.style.display = 'none';
-                                        }, 2000);
-                                      }
-                                    }}
-                                    className="absolute right-0 text-gray-400 hover:text-white transition-all ml-2 p-1 opacity-0 group-hover:opacity-100"
-                                    title="Copy to clipboard"
-                                  >
-                                    <ClipboardDocumentIcon className="h-5 w-5" />
-                                    <div 
-                                      id={`copy-tooltip-main-${item.id}`}
-                                      className="hidden absolute right-0 -top-8 bg-gray-700 text-white text-xs px-2 py-1 rounded"
-                                    >
-                                      Copied!
-                                    </div>
-                                  </button>
+                              <div className="flex justify-between items-start">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-4 text-gray-300 text-sm mb-2">
+                                    <span>Created: {formatDate(item.created_at)}</span>
+                                  </div>
+                                  <p className="text-white break-words">
+                                    {item.text || (item.status === 'processing' ? 'Please wait, transcription is still processing...' : 'No transcription available')}
+                                  </p>
+                                  {item.error && (
+                                    <p className="text-red-400 text-sm mt-2">
+                                      Error: {item.error}
+                                    </p>
+                                  )}
                                 </div>
-                                <p className="text-sm text-gray-400 mt-2">
-                                  {new Date(item.created_at).toLocaleString()}
-                                </p>
+                                <TranscriptionStatus 
+                                  status={item.status} 
+                                  className="ml-4" 
+                                />
                               </div>
+                              {item.language_code && (
+                                <p className="text-gray-400 text-sm">
+                                  Language: {item.language_code.toUpperCase()}
+                                </p>
+                              )}
+                              {item.audio_url && (
+                                <p className="text-gray-400 text-sm">
+                                  Audio: {new URL(item.audio_url).pathname.split('/').pop()}
+                                </p>
+                              )}
                             </motion.div>
                           ))}
                         </div>
@@ -1201,7 +1205,7 @@ export default function Home() {
                                 }, 2000);
                               }
                             }}
-                            className="absolute right-0 text-gray-400 hover:text-white transition-all ml-2 p-1 opacity-0 group-hover:opacity-100"
+                            className="absolute right-0 top-0 text-gray-400 hover:text-white transition-all ml-2 p-1 opacity-0 group-hover:opacity-100"
                             title="Copy to clipboard"
                           >
                             <ClipboardDocumentIcon className="h-5 w-5" />
