@@ -25,6 +25,7 @@ import {
 } from '@/services/api';
 import TranscriptionStatus from '@/components/TranscriptionStatus';
 import type { TranscriptionStatus as TranscriptionStatusType } from '@/components/TranscriptionStatus';
+import LanguageSelector from '@/components/LanguageSelector';
 
 interface TranscriptionStats {
   characters: number;
@@ -58,6 +59,7 @@ export default function Home() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [recordingDuration, setRecordingDuration] = useState(0);
+  const [selectedLanguage, setSelectedLanguage] = useState('en');
 
   const filteredHistory = useMemo(() => {
     if (activeTab === 'all') return history;
@@ -423,31 +425,18 @@ export default function Home() {
           }
         };
 
-        // RIFF identifier
         writeString(view, 0, 'RIFF');
-        // File length minus RIFF identifier length and file description length
         view.setUint32(4, 36 + length * 2, true);
-        // WAVE identifier
         writeString(view, 8, 'WAVE');
-        // Format chunk identifier
         writeString(view, 12, 'fmt ');
-        // Format chunk length
         view.setUint32(16, 16, true);
-        // Sample format (raw)
         view.setUint16(20, 1, true);
-        // Channel count
         view.setUint16(22, numberOfChannels, true);
-        // Sample rate
         view.setUint32(24, sampleRate, true);
-        // Byte rate (sample rate * block align)
         view.setUint32(28, sampleRate * 4, true);
-        // Block align (channel count * bytes per sample)
         view.setUint16(32, numberOfChannels * 2, true);
-        // Bits per sample
         view.setUint16(34, 16, true);
-        // Data chunk identifier
         writeString(view, 36, 'data');
-        // Data chunk length
         view.setUint32(40, length * 2, true);
 
         const channel = audioBuffer.getChannelData(0);
@@ -468,12 +457,13 @@ export default function Home() {
         convertedSize: formatFileSize(wavBlob.size),
         sampleRate: audioBuffer.sampleRate,
         channels: audioBuffer.numberOfChannels,
-        duration: audioBuffer.duration.toFixed(2) + 's'
+        duration: audioBuffer.duration.toFixed(2) + 's',
+        language: selectedLanguage
       });
 
       await uploadAudioForTranscription(wavBlob, (progress) => {
         setUploadProgress(progress);
-      });
+      }, selectedLanguage);
 
       // After successful upload, just load history and reset UI
       setCurrentStatus('completed');
@@ -826,6 +816,12 @@ export default function Home() {
               <div className="text-sm text-gray-400 mt-4">
                 <p>Record audio or drag and drop an audio file here</p>
                 <p className="mt-1">Supported formats: MP3, WAV, AAC, OGG, FLAC, M4A (max 5MB)</p>
+              </div>
+              <div className="mt-8 flex justify-center">
+                <LanguageSelector
+                  selectedLanguage={selectedLanguage}
+                  onLanguageChange={setSelectedLanguage}
+                />
               </div>
             </div>
 

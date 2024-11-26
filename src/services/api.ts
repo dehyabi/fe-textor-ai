@@ -107,6 +107,9 @@ export const uploadAudioForTranscription = async (
       const formData = new FormData();
       const filename = 'recording.' + (audioBlob.type.split('/')[1] || 'wav');
       formData.append('file', audioBlob, filename);
+      if (languageCode) {
+        formData.append('language_code', languageCode);
+      }
       
       const response = await api.post('/api/transcribe/upload/', formData, {
         headers: {
