@@ -12,7 +12,11 @@ import {
   ClipboardDocumentIcon,
   ArrowDownTrayIcon,
   ClockIcon,
-  XMarkIcon
+  XMarkIcon,
+  DocumentTextIcon,
+  ArrowPathIcon,
+  DocumentIcon,
+  ExclamationTriangleIcon
 } from '@heroicons/react/24/solid';
 import clsx from 'clsx';
 import { 
@@ -23,9 +27,8 @@ import {
   uploadAudioForTranscription, 
   checkTranscriptionStatus 
 } from '@/services/api';
-import TranscriptionStatus from '@/components/TranscriptionStatus';
-import type { TranscriptionStatus as TranscriptionStatusType } from '@/components/TranscriptionStatus';
 import LanguageSelector from '@/components/LanguageSelector';
+import TranscriptionStatus, { type TranscriptionStatus as TranscriptionStatusType } from '@/components/TranscriptionStatus';
 
 interface TranscriptionStats {
   characters: number;
@@ -45,7 +48,7 @@ export default function Home() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [stats, setStats] = useState<TranscriptionStats>({ characters: 0, words: 0, sentences: 0 });
-  const [currentStatus, setCurrentStatus] = useState<TranscriptionStatusType>('queued');
+  const [currentStatus, setCurrentStatus] = useState<'queued' | 'processing' | 'completed' | 'error'>('queued');
   const [showHistory, setShowHistory] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'queued' | 'processing' | 'completed' | 'error'>('all');
@@ -60,6 +63,7 @@ export default function Home() {
   const [duration, setDuration] = useState(0);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [selectedLanguage, setSelectedLanguage] = useState('en');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const filteredHistory = useMemo(() => {
     if (activeTab === 'all') return history;
@@ -206,9 +210,19 @@ export default function Home() {
   };
 
   const handleFileSelection = async (file: File) => {
-    const maxSize = 5 * 1024 * 1024; // 5MB in bytes
-    if (file.size > maxSize) {
-      setError(`File size must be less than ${formatFileSize(maxSize)}`);
+    const maxSizeInMB = 5;
+    const fileSizeInMB = file.size / (1024 * 1024);
+    
+    console.log('File validation:', {
+      fileName: file.name,
+      fileType: file.type,
+      sizeInBytes: file.size,
+      sizeInMB: fileSizeInMB.toFixed(2),
+      maxSizeInMB: maxSizeInMB
+    });
+
+    if (fileSizeInMB > maxSizeInMB) {
+      setError(`File size (${formatFileSize(file.size)}) exceeds the limit of ${maxSizeInMB}MB`);
       return;
     }
 
@@ -217,27 +231,69 @@ export default function Home() {
       'audio/x-wav', 'audio/aac', 'audio/ogg', 'audio/flac',
       'audio/x-m4a', 'audio/mp4', 'audio/x-mp3'
     ];
+    
     if (!allowedTypes.includes(file.type)) {
       setError('Please upload a supported audio file (MP3, WAV, AAC, OGG, FLAC, M4A)');
       return;
     }
 
     try {
-      const audioUrl = URL.createObjectURL(file);
-      setAudioPreview(audioUrl);
       setError(null);
       
-      // Create a temporary audio element to get duration
+      // Set audio preview
+      const audioUrl = URL.createObjectURL(file);
+      setAudioPreview(audioUrl);
+      
+      // Store the file for later upload
+      setSelectedFile(file);
+      
+      // Get duration
       const tempAudio = new Audio(audioUrl);
       tempAudio.addEventListener('loadedmetadata', () => {
         setDuration(tempAudio.duration);
         setCurrentTime(0);
       });
-      
-      setUploadProgress(0);
     } catch (error: any) {
       console.error('Error processing audio file:', error);
       setError(error.message || 'Failed to process audio file. Please try again.');
+    }
+  };
+
+  const handleStartTranscription = async () => {
+    if (!selectedFile) {
+      setError('Please select an audio file first');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+      setCurrentStatus('queued');
+      setUploadProgress(0);
+      
+      console.log('Starting transcription:', {
+        originalType: selectedFile.type,
+        originalSize: formatFileSize(selectedFile.size),
+        language: selectedLanguage || 'en'
+      });
+
+      await uploadAudioForTranscription(
+        selectedFile,
+        setUploadProgress,
+        selectedLanguage
+      );
+
+      setCurrentStatus('completed');
+      setAudioPreview(null);
+      setTranscription('');
+      await loadTranscriptionHistory();
+      setShowHistory(true); // Show history modal
+    } catch (error: any) {
+      console.error('Transcription error:', error);
+      setError(error.message || 'Failed to start transcription');
+      setCurrentStatus('error');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -252,6 +308,7 @@ export default function Home() {
       setError(null);
       setCurrentTime(0);
       setDuration(0);
+      setSelectedFile(null); // Clear selected file when starting new recording
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           channelCount: 1,
@@ -278,9 +335,10 @@ export default function Home() {
       mediaRecorderRef.current.onstop = async () => {
         try {
           const audioBlob = new Blob(chunksRef.current, { type: mimeType });
-          console.log('Recording completed:', {
+          console.log('Initial recording:', {
             type: audioBlob.type,
-            size: audioBlob.size,
+            sizeInBytes: audioBlob.size,
+            sizeInMB: (audioBlob.size / (1024 * 1024)).toFixed(2),
             chunks: chunksRef.current.length
           });
           
@@ -329,6 +387,21 @@ export default function Home() {
             resolve(new Blob([wavBuffer], { type: 'audio/wav' }));
           });
 
+          console.log('After WAV conversion:', {
+            type: wavBlob.type,
+            sizeInBytes: wavBlob.size,
+            sizeInMB: (wavBlob.size / (1024 * 1024)).toFixed(2)
+          });
+
+          // Check WAV file size
+          if (wavBlob.size / (1024 * 1024) > 5) {
+            throw new Error('Recorded audio exceeds 5MB limit. Try recording a shorter audio.');
+          }
+
+          // Create a File object from the WAV blob
+          const wavFile = new File([wavBlob], 'recording.wav', { type: 'audio/wav' });
+          setSelectedFile(wavFile);
+
           const audioUrl = URL.createObjectURL(wavBlob);
           setAudioPreview(audioUrl);
           setDuration(audioBuffer.duration);
@@ -369,6 +442,7 @@ export default function Home() {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
+      setSelectedFile(null); // Clear selected file when stopping recording
       setIsLoading(true);
     }
   };
@@ -741,7 +815,7 @@ export default function Home() {
                       </div>
                       <div className="flex items-center space-x-2">
                         <motion.button
-                          onClick={handleTranscription}
+                          onClick={handleStartTranscription}
                           className="px-4 py-2 bg-purple-500 hover:bg-purple-600 rounded-lg text-white transition-colors"
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
@@ -849,6 +923,7 @@ export default function Home() {
                     <TranscriptionStatus 
                       status={currentStatus}
                       error={error || undefined}
+                      showBadge={true}
                     />
                     {uploadProgress > 0 && (
                       <div className="w-full">
@@ -871,7 +946,11 @@ export default function Home() {
                   >
                     <div className="flex justify-between items-start mb-4">
                       <h3 className="text-lg font-semibold">Transcription Result</h3>
-                      <TranscriptionStatus status="completed" />
+                      <TranscriptionStatus 
+                        status={currentStatus}
+                        error={error || undefined}
+                        showBadge={true}
+                      />
                     </div>
                     <div className="flex justify-end space-x-2 mb-4">
                       <motion.button
@@ -970,11 +1049,45 @@ export default function Home() {
                           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
                         </div>
                       ) : !filteredHistory || filteredHistory.length === 0 ? (
-                        <p className="text-gray-400 text-center">
-                          {history.length === 0 
-                            ? 'No transcriptions yet' 
-                            : `No ${activeTab} transcriptions`}
-                        </p>
+                        <div className="flex flex-col items-center justify-center h-64 text-center px-4">
+                          {history.length === 0 ? (
+                            <>
+                              <DocumentTextIcon className="h-16 w-16 text-gray-500 mb-4" />
+                              <p className="text-gray-300 text-lg font-medium mb-2">No Transcriptions Yet</p>
+                              <p className="text-gray-400">Start by uploading an audio file to create your first transcription</p>
+                            </>
+                          ) : activeTab === 'completed' ? (
+                            <>
+                              <DocumentIcon className="h-16 w-16 text-gray-500 mb-4" />
+                              <p className="text-gray-300 text-lg font-medium mb-2">No Completed Transcriptions</p>
+                              <p className="text-gray-400">Your completed transcriptions will appear here</p>
+                            </>
+                          ) : activeTab === 'processing' ? (
+                            <>
+                              <ArrowPathIcon className="h-16 w-16 text-gray-500 mb-4" />
+                              <p className="text-gray-300 text-lg font-medium mb-2">No Processing Transcriptions</p>
+                              <p className="text-gray-400">Transcriptions being processed will appear here</p>
+                            </>
+                          ) : activeTab === 'queued' ? (
+                            <>
+                              <ClockIcon className="h-16 w-16 text-gray-500 mb-4" />
+                              <p className="text-gray-300 text-lg font-medium mb-2">No Queued Transcriptions</p>
+                              <p className="text-gray-400">Transcriptions waiting to be processed will appear here</p>
+                            </>
+                          ) : activeTab === 'error' ? (
+                            <>
+                              <ExclamationTriangleIcon className="h-16 w-16 text-gray-500 mb-4" />
+                              <p className="text-gray-300 text-lg font-medium mb-2">No Failed Transcriptions</p>
+                              <p className="text-gray-400">Great! None of your transcriptions have failed</p>
+                            </>
+                          ) : (
+                            <>
+                              <DocumentTextIcon className="h-16 w-16 text-gray-500 mb-4" />
+                              <p className="text-gray-300 text-lg font-medium mb-2">No Transcriptions Found</p>
+                              <p className="text-gray-400">Try selecting a different filter</p>
+                            </>
+                          )}
+                        </div>
                       ) : (
                         <div className="space-y-4">
                           {filteredHistory.map((item) => (
@@ -988,12 +1101,6 @@ export default function Home() {
                                 <div className="flex-1">
                                   <div className="flex items-center gap-4 text-gray-300 text-sm mb-2">
                                     <span>Created: {formatDate(item.created_at)}</span>
-                                    {item.completed_at && (
-                                      <span className="flex items-center">
-                                        <span className="mx-2 text-gray-500">•</span>
-                                        Completed: {formatDate(item.completed_at)}
-                                      </span>
-                                    )}
                                   </div>
                                   <p className="text-white break-words">
                                     {item.text || 'No transcription available'}

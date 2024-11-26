@@ -1,7 +1,6 @@
 'use client';
 
-import { motion } from 'framer-motion';
-import { CheckCircleIcon, ExclamationCircleIcon } from '@heroicons/react/24/solid';
+import { CheckCircleIcon, ExclamationCircleIcon, ClockIcon, ArrowPathIcon } from '@heroicons/react/24/solid';
 
 export type TranscriptionStatus = 'queued' | 'processing' | 'completed' | 'error';
 
@@ -9,54 +8,58 @@ interface TranscriptionStatusProps {
   status: TranscriptionStatus;
   error?: string;
   className?: string;
+  showBadge?: boolean;
 }
 
 const statusConfig = {
   queued: {
-    color: 'bg-blue-100 text-blue-700',
-    text: 'Queued',
-    icon: () => (
-      <div className="animate-pulse">
-        <div className="h-4 w-4 rounded-full bg-blue-500" />
-      </div>
-    ),
+    icon: ClockIcon,
+    color: 'text-blue-500',
+    bgColor: 'bg-blue-100',
+    text: 'Queued'
   },
   processing: {
-    color: 'bg-yellow-100 text-yellow-700',
-    text: 'Processing',
-    icon: () => (
-      <div className="relative">
-        <div className="absolute animate-ping h-4 w-4 rounded-full bg-yellow-400 opacity-75"></div>
-        <div className="relative h-4 w-4 rounded-full bg-yellow-500"></div>
-      </div>
-    ),
+    icon: ArrowPathIcon,
+    color: 'text-yellow-500',
+    bgColor: 'bg-yellow-100',
+    text: 'Processing'
   },
   completed: {
-    color: 'bg-green-100 text-green-700',
-    text: 'Completed',
-    icon: () => <CheckCircleIcon className="h-5 w-5 text-green-500" />,
+    icon: CheckCircleIcon,
+    color: 'text-green-500',
+    bgColor: 'bg-green-100',
+    text: 'Completed'
   },
   error: {
-    color: 'bg-red-100 text-red-700',
-    text: 'Error',
-    icon: () => <ExclamationCircleIcon className="h-5 w-5 text-red-500" />,
-  },
+    icon: ExclamationCircleIcon,
+    color: 'text-red-500',
+    bgColor: 'bg-red-100',
+    text: 'Error'
+  }
 };
 
-export default function TranscriptionStatus({ status, error, className }: TranscriptionStatusProps) {
+export default function TranscriptionStatus({ status, error, className, showBadge = false }: TranscriptionStatusProps) {
+  const Icon = statusConfig[status].icon;
   const config = statusConfig[status];
+  
+  if (showBadge) {
+    return (
+      <div className={`flex items-center space-x-2 rounded-lg px-3 py-1.5 ${config.bgColor} ${className || ''}`}>
+        <Icon className={`h-5 w-5 ${config.color} ${status === 'processing' ? 'animate-spin' : ''}`} />
+        <span className={`font-medium ${config.color}`}>{config.text}</span>
+        {error && status === 'error' && (
+          <span className="text-sm text-red-600 ml-2">({error})</span>
+        )}
+      </div>
+    );
+  }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: -10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={`flex items-center space-x-2 rounded-lg px-3 py-1.5 ${config.color} ${className}`}
-    >
-      <config.icon />
-      <span className="font-medium">{config.text}</span>
+    <div className={`flex items-center ${className || ''}`}>
+      <Icon className={`h-5 w-5 ${config.color} ${status === 'processing' ? 'animate-spin' : ''}`} />
       {error && status === 'error' && (
         <span className="text-sm text-red-600 ml-2">({error})</span>
       )}
-    </motion.div>
+    </div>
   );
 }
