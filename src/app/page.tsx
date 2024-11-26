@@ -14,6 +14,7 @@ import {
   ClockIcon,
   XMarkIcon,
   DocumentTextIcon,
+  FolderIcon,
   ArrowPathIcon,
   DocumentIcon,
   ExclamationTriangleIcon
@@ -25,7 +26,8 @@ import {
   TranscriptionHistoryResponse, 
   getTranscriptionHistory, 
   uploadAudioForTranscription, 
-  checkTranscriptionStatus 
+  checkTranscriptionStatus,
+  TranscriptionsByStatus
 } from '@/services/api';
 import LanguageSelector from '@/components/LanguageSelector';
 import TranscriptionStatus, { type TranscriptionStatus as TranscriptionStatusType } from '@/components/TranscriptionStatus';
@@ -41,7 +43,12 @@ export default function Home() {
   const [transcription, setTranscription] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [history, setHistory] = useState<TranscriptionItem[]>([]);
+  const [history, setHistory] = useState<TranscriptionsByStatus>({
+    queued: [],
+    processing: [],
+    completed: [],
+    error: []
+  });
   const [isDragging, setIsDragging] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [audioPreview, setAudioPreview] = useState<string | null>(null);
@@ -66,9 +73,21 @@ export default function Home() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const filteredHistory = useMemo(() => {
-    if (activeTab === 'all') return history;
-    return history.filter(item => item.status === activeTab);
+    if (!history) return [];
+    
+    if (activeTab === 'all') {
+      return Object.values(history)
+        .flat()
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    }
+    
+    return history[activeTab]
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }, [history, activeTab]);
+
+  const hasTranscriptions = useMemo(() => {
+    return Object.values(statusCounts).some(count => count > 0);
+  }, [statusCounts]);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -79,55 +98,10 @@ export default function Home() {
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    if (showHistory && !isLoadingHistory) {
+    if (showHistory) {
       loadTranscriptionHistory();
     }
   }, [showHistory]);
-
-  useEffect(() => {
-    const words = transcription.trim().split(/\s+/).filter(Boolean).length;
-    const characters = transcription.length;
-    const sentences = transcription.split(/[.!?]+/).filter(Boolean).length;
-    setStats({ words, characters, sentences });
-  }, [transcription]);
-
-  useEffect(() => {
-    const dropZone = dropZoneRef.current;
-    if (!dropZone) return;
-
-    const handleDragOver = (e: DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsDragging(true);
-    };
-
-    const handleDragLeave = (e: DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsDragging(false);
-    };
-
-    const handleDrop = async (e: DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsDragging(false);
-
-      const files = e.dataTransfer?.files;
-      if (files && files.length > 0) {
-        await handleFileSelection(files[0]);
-      }
-    };
-
-    dropZone.addEventListener('dragover', handleDragOver);
-    dropZone.addEventListener('dragleave', handleDragLeave);
-    dropZone.addEventListener('drop', handleDrop);
-
-    return () => {
-      dropZone.removeEventListener('dragover', handleDragOver);
-      dropZone.removeEventListener('dragleave', handleDragLeave);
-      dropZone.removeEventListener('drop', handleDrop);
-    };
-  }, []);
 
   useEffect(() => {
     if (showHistory) {
@@ -175,23 +149,22 @@ export default function Home() {
     try {
       setIsLoadingHistory(true);
       const response: TranscriptionHistoryResponse = await getTranscriptionHistory();
+      console.log('Received history:', response);
       
       // Update status counts
       setStatusCounts(response.status_counts);
       
-      // Combine all transcriptions and sort by creation date
-      const allTranscriptions = [
-        ...response.transcriptions.queued,
-        ...response.transcriptions.processing,
-        ...response.transcriptions.completed,
-        ...response.transcriptions.error
-      ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-      // Set all transcriptions
-      setHistory(allTranscriptions);
+      // Set history with the transcriptions grouped by status
+      setHistory(response.transcriptions);
+      
     } catch (error) {
       console.error('Error loading history:', error);
-      setHistory([]);
+      setHistory({
+        queued: [],
+        processing: [],
+        completed: [],
+        error: []
+      });
       setStatusCounts({
         queued: 0,
         processing: 0,
@@ -200,6 +173,13 @@ export default function Home() {
       });
     } finally {
       setIsLoadingHistory(false);
+    }
+  };
+
+  const handleTabClick = async (tab: 'all' | 'queued' | 'processing' | 'completed' | 'error') => {
+    setActiveTab(tab);
+    if (showHistory) {
+      await loadTranscriptionHistory();
     }
   };
 
@@ -692,14 +672,17 @@ export default function Home() {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  const renderTab = (status: typeof activeTab, label: string) => {
-    const count = status === 'all' 
-      ? history.length 
-      : statusCounts[status] || 0;
+  const getTabCount = (status: 'all' | 'queued' | 'processing' | 'completed' | 'error') => {
+    if (status === 'all') {
+      return Object.values(statusCounts).reduce((sum, count) => sum + count, 0);
+    }
+    return statusCounts[status] || 0;
+  };
 
+  const renderTab = (status: 'all' | 'queued' | 'processing' | 'completed' | 'error', label: string) => {
     return (
       <button
-        onClick={() => setActiveTab(status)}
+        onClick={() => handleTabClick(status)}
         className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors relative ${
           activeTab === status
             ? 'bg-purple-600 text-white'
@@ -707,12 +690,12 @@ export default function Home() {
         }`}
       >
         {label}
-        <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
+        <span className={`ml-2 px-2 py-0.5 text-xs rounded-full ${
           activeTab === status
             ? 'bg-purple-700 text-purple-100'
             : 'bg-gray-700 text-gray-400'
         }`}>
-          {count}
+          {getTabCount(status)}
         </span>
       </button>
     );
@@ -735,7 +718,7 @@ export default function Home() {
 
       <div className={clsx(
         "relative container mx-auto px-4 max-w-4xl",
-        history.length > 0 ? "py-8" : "pt-8 pb-4"
+        Object.values(statusCounts).some(count => count > 0) ? "py-8" : "pt-8 pb-4"
       )}>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -1052,55 +1035,31 @@ export default function Home() {
                         </div>
                       ) : !filteredHistory || filteredHistory.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-64 text-center px-4">
-                          {history.length === 0 ? (
+                          {!hasTranscriptions ? (
                             <>
                               <DocumentTextIcon className="h-16 w-16 text-gray-500 mb-4" />
                               <p className="text-gray-300 text-lg font-medium mb-2">No Transcriptions Yet</p>
-                              <p className="text-gray-400">Start by uploading an audio file to create your first transcription</p>
-                            </>
-                          ) : activeTab === 'completed' ? (
-                            <>
-                              <DocumentIcon className="h-16 w-16 text-gray-500 mb-4" />
-                              <p className="text-gray-300 text-lg font-medium mb-2">No Completed Transcriptions</p>
-                              <p className="text-gray-400">Your completed transcriptions will appear here</p>
-                            </>
-                          ) : activeTab === 'processing' ? (
-                            <>
-                              <ArrowPathIcon className="h-16 w-16 text-gray-500 mb-4" />
-                              <p className="text-gray-300 text-lg font-medium mb-2">No Processing Transcriptions</p>
-                              <p className="text-gray-400">Transcriptions being processed will appear here</p>
-                            </>
-                          ) : activeTab === 'queued' ? (
-                            <>
-                              <ClockIcon className="h-16 w-16 text-gray-500 mb-4" />
-                              <p className="text-gray-300 text-lg font-medium mb-2">No Queued Transcriptions</p>
-                              <p className="text-gray-400">Transcriptions waiting to be processed will appear here</p>
-                            </>
-                          ) : activeTab === 'error' ? (
-                            <>
-                              <ExclamationTriangleIcon className="h-16 w-16 text-gray-500 mb-4" />
-                              <p className="text-gray-300 text-lg font-medium mb-2">No Failed Transcriptions</p>
-                              <p className="text-gray-400">Great! None of your transcriptions have failed</p>
+                              <p className="text-gray-400">Record or upload an audio file to get started</p>
                             </>
                           ) : (
                             <>
-                              <DocumentTextIcon className="h-16 w-16 text-gray-500 mb-4" />
-                              <p className="text-gray-300 text-lg font-medium mb-2">No Transcriptions Found</p>
-                              <p className="text-gray-400">Try selecting a different filter</p>
+                              <FolderIcon className="h-16 w-16 text-gray-500 mb-4" />
+                              <p className="text-gray-300 text-lg font-medium mb-2">No {activeTab === 'all' ? '' : activeTab} Transcriptions</p>
+                              <p className="text-gray-400">Check other tabs or create a new transcription</p>
                             </>
                           )}
                         </div>
                       ) : (
                         <div className="space-y-4 px-4 py-4">
-                          {filteredHistory.map((item, index) => (
+                          {filteredHistory.map((item) => (
                             <motion.div
                               key={item.id}
                               initial={{ opacity: 0, y: 20 }}
                               animate={{ opacity: 1, y: 0 }}
                               className={clsx(
                                 "bg-gray-700 rounded-lg p-4 space-y-2",
-                                index === 0 && "mt-2",
-                                index === filteredHistory.length - 1 && "mb-6"
+                                item === filteredHistory[0] && "mt-2",
+                                item === filteredHistory[filteredHistory.length - 1] && "mb-6"
                               )}
                             >
                               <div className="flex justify-between items-start">
@@ -1142,14 +1101,14 @@ export default function Home() {
               )}
             </AnimatePresence>
 
-            {history.length > 0 && (
+            {Object.values(statusCounts).some(count => count > 0) && (
               <div className={clsx(
                 "relative w-full",
-                history.length > 0 ? "mt-4" : "mt-0"
+                Object.values(statusCounts).some(count => count > 0) ? "mt-4" : "mt-0"
               )}>
                 <h2 className="text-2xl font-semibold mb-4 text-gray-200">Previous Transcriptions</h2>
                 <div className="space-y-4">
-                  {history.map((item) => (
+                  {filteredHistory.map((item) => (
                     <motion.div
                       key={item.id}
                       initial={{ opacity: 0 }}
@@ -1162,25 +1121,7 @@ export default function Home() {
                           {new Date(item.created_at).toLocaleString()}
                         </p>
                       </div>
-                      <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <motion.button
-                          onClick={() => {
-                            if (item.text) {
-                              navigator.clipboard.writeText(item.text);
-                              setCopiedId(item.id);
-                              setTimeout(() => setCopiedId(null), 2000);
-                            }
-                          }}
-                          className={clsx(
-                            "p-2 rounded-lg transition-colors",
-                            copiedId === item.id ? "text-green-500" : "text-gray-400 hover:text-purple-400"
-                          )}
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                        >
-                          <ClipboardDocumentIcon className="w-5 h-5" />
-                        </motion.button>
-                      </div>
+                      <TranscriptionStatus status={item.status} className="ml-4" />
                     </motion.div>
                   ))}
                 </div>
@@ -1192,7 +1133,7 @@ export default function Home() {
       {/* Credit Footer */}
       <div className={clsx(
         "relative container mx-auto px-4 max-w-4xl",
-        history.length > 0 ? "mt-4" : "mt-2"
+        Object.values(statusCounts).some(count => count > 0) ? "mt-4" : "mt-2"
       )}>
         <footer className="text-center text-gray-500 text-sm p-4 bg-white/5 backdrop-blur-sm border-t border-gray-800 rounded-lg">
           Built with ❤️ in Indonesia by{' '}
