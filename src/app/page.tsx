@@ -59,6 +59,11 @@ export default function Home() {
   const [duration, setDuration] = useState(0);
   const [recordingDuration, setRecordingDuration] = useState(0);
 
+  const filteredHistory = useMemo(() => {
+    if (activeTab === 'all') return history;
+    return history.filter(item => item.status === activeTab);
+  }, [history, activeTab]);
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -166,14 +171,15 @@ export default function Home() {
       // Update status counts
       setStatusCounts(response.status_counts);
       
-      // Combine all transcriptions and filter out any without text for completed status
+      // Combine all transcriptions and sort by creation date
       const allTranscriptions = [
         ...response.transcriptions.queued,
         ...response.transcriptions.processing,
-        ...response.transcriptions.completed.filter(t => t.text), // Only show completed if there's text
+        ...response.transcriptions.completed,
         ...response.transcriptions.error
       ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
+      // Set all transcriptions
       setHistory(allTranscriptions);
     } catch (error) {
       console.error('Error loading history:', error);
@@ -198,13 +204,6 @@ export default function Home() {
   };
 
   const handleFileSelection = async (file: File) => {
-    console.log('File details:', {
-      name: file.name,
-      type: file.type,
-      size: file.size,
-      sizeInMB: file.size / (1024 * 1024)
-    });
-
     const maxSize = 5 * 1024 * 1024; // 5MB in bytes
     if (file.size > maxSize) {
       setError(`File size must be less than ${formatFileSize(maxSize)}`);
@@ -222,31 +221,21 @@ export default function Home() {
     }
 
     try {
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const arrayBuffer = await file.arrayBuffer();
-      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-
-      // Only check basic duration
-      if (audioBuffer.duration < 0.1) { // Minimal duration check
-        setError('Audio file is too short.');
-        handleCancelAudio();
-        return;
-      }
-
       const audioUrl = URL.createObjectURL(file);
       setAudioPreview(audioUrl);
       setError(null);
-      setDuration(audioBuffer.duration);
-      setCurrentTime(0);
       
-      if (audioRef.current) {
-        audioRef.current.src = audioUrl;
-        audioRef.current.load();
-      }
-    } catch (error) {
-      console.error('Error validating audio:', error);
-      setError('Failed to process audio file. Please try a different file.');
-      handleCancelAudio();
+      // Create a temporary audio element to get duration
+      const tempAudio = new Audio(audioUrl);
+      tempAudio.addEventListener('loadedmetadata', () => {
+        setDuration(tempAudio.duration);
+        setCurrentTime(0);
+      });
+      
+      setUploadProgress(0);
+    } catch (error: any) {
+      console.error('Error processing audio file:', error);
+      setError(error.message || 'Failed to process audio file. Please try again.');
     }
   };
 
@@ -298,14 +287,15 @@ export default function Home() {
           const arrayBuffer = await audioBlob.arrayBuffer();
           const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
           
-          // Create WAV file with optimized settings
+          // Create WAV file
           const wavBlob = await new Promise<Blob>((resolve) => {
-            const numberOfChannels = 1; // Force mono
-            const sampleRate = 16000; // Use 16kHz
-            const length = Math.ceil(audioBuffer.duration * sampleRate);
+            const numberOfChannels = audioBuffer.numberOfChannels;
+            const length = audioBuffer.length;
+            const sampleRate = audioBuffer.sampleRate;
             const wavBuffer = new ArrayBuffer(44 + length * 2);
             const view = new DataView(wavBuffer);
             
+            // Write WAV header
             const writeString = (view: DataView, offset: number, string: string) => {
               for (let i = 0; i < string.length; i++) {
                 view.setUint8(offset + i, string.charCodeAt(i));
@@ -320,27 +310,16 @@ export default function Home() {
             view.setUint16(20, 1, true);
             view.setUint16(22, numberOfChannels, true);
             view.setUint32(24, sampleRate, true);
-            view.setUint32(28, sampleRate * 2, true); // byterate = sampleRate * blockAlign
+            view.setUint32(28, sampleRate * 4, true);
             view.setUint16(32, numberOfChannels * 2, true);
             view.setUint16(34, 16, true);
             writeString(view, 36, 'data');
             view.setUint32(40, length * 2, true);
 
-            // Resample and convert to mono if needed
-            const resampleRatio = sampleRate / audioBuffer.sampleRate;
             const channel = audioBuffer.getChannelData(0);
             let offset = 44;
             for (let i = 0; i < length; i++) {
-              const position = Math.floor(i / resampleRatio);
-              let sample = position < channel.length ? channel[position] : 0;
-              
-              // If stereo, mix down to mono
-              if (audioBuffer.numberOfChannels === 2) {
-                const rightChannel = audioBuffer.getChannelData(1);
-                sample = (sample + (position < rightChannel.length ? rightChannel[position] : 0)) / 2;
-              }
-              
-              sample = Math.max(-1, Math.min(1, sample)); // Clamp
+              const sample = Math.max(-1, Math.min(1, channel[i]));
               view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
               offset += 2;
             }
@@ -417,28 +396,104 @@ export default function Home() {
     try {
       setIsLoading(true);
       setError(null);
-      setCurrentStatus('processing');
+      setCurrentStatus('queued');
       setUploadProgress(0);
 
-      // Convert audio preview URL back to blob
+      // Get the audio blob from the preview URL
       const response = await fetch(audioPreview);
       const audioBlob = await response.blob();
 
-      // Attempt upload
-      await uploadAudioForTranscription(audioBlob, (progress) => {
+      // Convert WebM to WAV
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const arrayBuffer = await audioBlob.arrayBuffer();
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      
+      // Create WAV file
+      const wavBlob = await new Promise<Blob>((resolve) => {
+        const numberOfChannels = audioBuffer.numberOfChannels;
+        const length = audioBuffer.length;
+        const sampleRate = audioBuffer.sampleRate;
+        const wavBuffer = new ArrayBuffer(44 + length * 2);
+        const view = new DataView(wavBuffer);
+        
+        // Write WAV header
+        const writeString = (view: DataView, offset: number, string: string) => {
+          for (let i = 0; i < string.length; i++) {
+            view.setUint8(offset + i, string.charCodeAt(i));
+          }
+        };
+
+        // RIFF identifier
+        writeString(view, 0, 'RIFF');
+        // File length minus RIFF identifier length and file description length
+        view.setUint32(4, 36 + length * 2, true);
+        // WAVE identifier
+        writeString(view, 8, 'WAVE');
+        // Format chunk identifier
+        writeString(view, 12, 'fmt ');
+        // Format chunk length
+        view.setUint32(16, 16, true);
+        // Sample format (raw)
+        view.setUint16(20, 1, true);
+        // Channel count
+        view.setUint16(22, numberOfChannels, true);
+        // Sample rate
+        view.setUint32(24, sampleRate, true);
+        // Byte rate (sample rate * block align)
+        view.setUint32(28, sampleRate * 4, true);
+        // Block align (channel count * bytes per sample)
+        view.setUint16(32, numberOfChannels * 2, true);
+        // Bits per sample
+        view.setUint16(34, 16, true);
+        // Data chunk identifier
+        writeString(view, 36, 'data');
+        // Data chunk length
+        view.setUint32(40, length * 2, true);
+
+        const channel = audioBuffer.getChannelData(0);
+        let offset = 44;
+        for (let i = 0; i < length; i++) {
+          const sample = Math.max(-1, Math.min(1, channel[i]));
+          view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+          offset += 2;
+        }
+
+        resolve(new Blob([wavBuffer], { type: 'audio/wav' }));
+      });
+
+      console.log('Starting transcription:', {
+        originalType: audioBlob.type,
+        convertedType: 'audio/wav',
+        originalSize: formatFileSize(audioBlob.size),
+        convertedSize: formatFileSize(wavBlob.size),
+        sampleRate: audioBuffer.sampleRate,
+        channels: audioBuffer.numberOfChannels,
+        duration: audioBuffer.duration.toFixed(2) + 's'
+      });
+
+      await uploadAudioForTranscription(wavBlob, (progress) => {
         setUploadProgress(progress);
       });
 
-      // On success
+      // After successful upload, just load history and reset UI
       setCurrentStatus('completed');
       setAudioPreview(null);
       setTranscription('');
-      handleCancelAudio();
       await loadTranscriptionHistory();
-      setShowHistory(true);
+      setShowHistory(true); // Show history modal
+
     } catch (error: any) {
-      console.error('Upload error:', error);
-      setError(error.message || 'Failed to upload audio. Please try again.');
+      console.error('Transcription failed:', {
+        error: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      
+      if (error.message.includes('Rate limit')) {
+        setError('Rate limit reached. Please wait a moment and try again.');
+      } else {
+        setError(error.message || 'Failed to transcribe audio. Please try again.');
+      }
       setCurrentStatus('error');
     } finally {
       setIsLoading(false);
@@ -570,11 +625,6 @@ export default function Home() {
     const seconds = Math.floor(time % 60);
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
-
-  const filteredHistory = useMemo(() => {
-    if (activeTab === 'all') return history;
-    return history.filter(item => item.status === activeTab);
-  }, [history, activeTab]);
 
   const renderTab = (status: typeof activeTab, label: string) => {
     const count = status === 'all' 
@@ -865,13 +915,20 @@ export default function Home() {
             </div>
 
             <div className="absolute top-4 right-4">
-              <button
+              <motion.button
                 onClick={handleHistoryClick}
-                className="flex items-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                className="flex items-center space-x-2 p-2 md:px-4 md:py-2 bg-gray-800 md:bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
               >
-                <ClockIcon className="h-5 w-5" />
-                <span>History</span>
-              </button>
+                <div className="flex md:hidden flex-col gap-1">
+                  <div className="w-5 h-0.5 bg-white"></div>
+                  <div className="w-5 h-0.5 bg-white"></div>
+                  <div className="w-5 h-0.5 bg-white"></div>
+                </div>
+                <ClockIcon className="hidden md:block h-5 w-5" />
+                <span className="hidden md:inline">History</span>
+              </motion.button>
             </div>
 
             <AnimatePresence>
