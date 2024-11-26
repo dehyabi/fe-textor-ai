@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 
 export type Language = {
@@ -91,6 +91,7 @@ export default function LanguageSelector({ selectedLanguage, onLanguageChange, c
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const selected = languages.find(lang => lang.code === selectedLanguage) || languages[0];
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Sort languages alphabetically by name and filter based on search
   const sortedAndFilteredLanguages = useMemo(() => {
@@ -104,8 +105,22 @@ export default function LanguageSelector({ selectedLanguage, onLanguageChange, c
     );
   }, [searchQuery]);
 
+  // Handle click outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
   return (
-    <div className={`relative inline-block ${className}`}>
+    <div ref={containerRef} className={`relative inline-block ${className}`}>
       <div className="text-center mb-2 text-gray-400">
         <span>Select Language</span>
       </div>
@@ -114,7 +129,13 @@ export default function LanguageSelector({ selectedLanguage, onLanguageChange, c
           type="text"
           placeholder="Search languages..."
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            if (!isOpen && e.target.value) {
+              setIsOpen(true);
+            }
+          }}
+          onFocus={() => setIsOpen(true)}
           className="w-full px-3 py-1.5 bg-gray-700 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm placeholder-gray-400"
           onClick={(e) => e.stopPropagation()}
         />
