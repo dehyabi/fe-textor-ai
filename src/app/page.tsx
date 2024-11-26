@@ -1109,7 +1109,7 @@ export default function Home() {
                                     <span>Created: {formatDate(item.created_at)}</span>
                                   </div>
                                   <p className="text-white break-words">
-                                    {item.text || 'No transcription available'}
+                                    {item.text || (item.status === 'processing' ? 'Please wait, transcription is still processing...' : 'No transcription available')}
                                   </p>
                                   {item.error && (
                                     <p className="text-red-400 text-sm mt-2">
