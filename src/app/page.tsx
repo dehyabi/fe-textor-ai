@@ -33,6 +33,7 @@ import {
 } from '@/services/api';
 import LanguageSelector from '@/components/LanguageSelector';
 import TranscriptionStatus from '@/components/TranscriptionStatus';
+import Pagination from '@/components/Pagination';
 
 interface TranscriptionStats {
   characters: number;
@@ -82,6 +83,8 @@ export default function Home() {
   const [languageError, setLanguageError] = useState<string>('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [showPreviousTranscriptions, setShowPreviousTranscriptions] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
 
   const filteredHistory = useMemo(() => {
     if (!history) return [];
@@ -109,6 +112,16 @@ export default function Home() {
       .filter(item => item.status === activeTab)
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }, [history, activeTab]);
+
+  const paginatedHistory = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredHistory.slice(startIndex, endIndex);
+  }, [filteredHistory, currentPage]);
+
+  const totalPages = useMemo(() => {
+    return Math.ceil(filteredHistory.length / itemsPerPage);
+  }, [filteredHistory]);
 
   const hasTranscriptions = useMemo(() => {
     return Object.values(statusCounts).some(count => count > 0);
@@ -213,6 +226,10 @@ export default function Home() {
       setShowPreviousTranscriptions(true);
     }
   }, [showHistory, history]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab]);
 
   const loadTranscriptionHistory = async () => {
     if (isLoadingHistory) return;
@@ -1193,30 +1210,25 @@ export default function Home() {
                         <div className="flex flex-col items-center justify-center h-64 text-center">
                           {!hasTranscriptions ? (
                             <>
-                              <DocumentTextIcon className="h-16 w-16 text-gray-500 mb-4" />
-                              <p className="text-gray-300 text-lg font-medium mb-2">No Transcriptions Yet</p>
-                              <p className="text-gray-400">Record or upload an audio file to get started</p>
+                              <DocumentTextIcon className="w-16 h-16 text-gray-600 mb-4" />
+                              <p className="text-gray-400">No transcriptions yet</p>
                             </>
                           ) : (
                             <>
-                              <FolderIcon className="h-16 w-16 text-gray-500 mb-4" />
-                              <p className="text-gray-300 text-lg font-medium mb-2">No {activeTab === 'all' ? '' : activeTab} Transcriptions</p>
-                              <p className="text-gray-400">Check other tabs or create a new transcription</p>
+                              <FolderIcon className="w-16 h-16 text-gray-600 mb-4" />
+                              <p className="text-gray-400">No transcriptions found in this category</p>
                             </>
                           )}
                         </div>
                       ) : (
-                        <div className="space-y-4 pt-4 pb-4">
-                          {filteredHistory.map((item) => (
+                        <div className="space-y-4 mt-4">
+                          {paginatedHistory.map((item, index) => (
                             <motion.div
                               key={item.id}
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              className={clsx(
-                                "bg-gray-700 rounded-lg p-4 space-y-2 group",
-                                item === filteredHistory[0] && "mt-2",
-                                item === filteredHistory[filteredHistory.length - 1] && "mb-6"
-                              )}
+                              initial={{ opacity: 0, y: 20 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: index * 0.1 }}
+                              className="p-4 bg-gray-700/50 rounded-lg backdrop-blur-sm border border-gray-600/50 group relative"
                             >
                               <div className="flex items-center justify-between relative mb-6">
                                 <p className="text-white break-words line-clamp-3 pr-8 w-full text-center">
@@ -1276,6 +1288,13 @@ export default function Home() {
                               </div>
                             </motion.div>
                           ))}
+                          {filteredHistory.length > itemsPerPage && (
+                            <Pagination
+                              currentPage={currentPage}
+                              totalPages={totalPages}
+                              onPageChange={setCurrentPage}
+                            />
+                          )}
                         </div>
                       )}
                     </div>
