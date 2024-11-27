@@ -1294,9 +1294,7 @@ export default function Home() {
                      onClick={() => setShowPreviousTranscriptions(!showPreviousTranscriptions)}>
                     <div className="flex-1" />
                     <h2 className="text-2xl font-semibold text-gray-200 flex-1 text-center group-hover:text-white transition-colors">
-                      Previous Transcriptions ({latestCompletedTranscriptions.length > 0 
-                        ? `Showing latest ${latestCompletedTranscriptions.length} completed` 
-                        : 'No completed transcriptions yet'})
+                      Previous Transcriptions
                     </h2>
                     <div className="flex-1 flex justify-end">
                       <button
