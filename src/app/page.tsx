@@ -32,12 +32,18 @@ import {
   TranscriptionsByStatus
 } from '@/services/api';
 import LanguageSelector from '@/components/LanguageSelector';
-import TranscriptionStatus, { type TranscriptionStatus as TranscriptionStatusType } from '@/components/TranscriptionStatus';
+import TranscriptionStatus from '@/components/TranscriptionStatus';
 
 interface TranscriptionStats {
   characters: number;
   words: number;
   sentences: number;
+}
+
+interface TranscriptionStatusProps {
+  status: 'queued' | 'processing' | 'completed' | 'error';
+  error?: string;
+  showBadge?: boolean;
 }
 
 export default function Home() {
@@ -80,19 +86,80 @@ export default function Home() {
   const filteredHistory = useMemo(() => {
     if (!history) return [];
     
+    const allTranscriptions = Object.values(history).flat();
+    
+    // First, update the status of transcriptions with no text
+    const processedTranscriptions = allTranscriptions.map(item => {
+      if (!item.text || item.text.trim() === '') {
+        return {
+          ...item,
+          status: 'error',
+          error: 'No transcription available'
+        };
+      }
+      return item;
+    });
+    
     if (activeTab === 'all') {
-      return Object.values(history)
-        .flat()
+      return processedTranscriptions
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     }
     
-    return history[activeTab]
+    return processedTranscriptions
+      .filter(item => item.status === activeTab)
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }, [history, activeTab]);
 
   const hasTranscriptions = useMemo(() => {
     return Object.values(statusCounts).some(count => count > 0);
   }, [statusCounts]);
+
+  const latestCompletedTranscriptions = useMemo(() => {
+    if (!history) return [];
+    
+    const allTranscriptions = Object.values(history).flat();
+    
+    return allTranscriptions
+      .filter(item => 
+        item.status === 'completed' && 
+        item.text && 
+        item.text.trim() !== ''
+      )
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 5);
+  }, [history]);
+
+  const showViewAllButton = useMemo(() => {
+    if (!history) return false;
+    const completedCount = Object.values(history)
+      .flat()
+      .filter(item => 
+        item.status === 'completed' && 
+        item.text && 
+        item.text.trim() !== ''
+      ).length;
+    return completedCount > 5;
+  }, [history]);
+
+  useEffect(() => {
+    if (history) {
+      const allTranscriptions = Object.values(history).flat();
+      
+      // Count transcriptions by status, treating empty text as errors
+      const counts = allTranscriptions.reduce((acc, item) => {
+        const status = (!item.text || item.text.trim() === '') ? 'error' : item.status;
+        acc[status] = (acc[status] || 0) + 1;
+        return acc;
+      }, {
+        queued: 0,
+        processing: 0,
+        completed: 0,
+        error: 0
+      } as TranscriptionStatusCounts);
+      
+      setStatusCounts(counts);
+    }
+  }, [history]);
 
   useEffect(() => {
     if (showHistory) {
@@ -1009,7 +1076,7 @@ export default function Home() {
                   <div className="mt-4 space-y-4">
                     <TranscriptionStatus 
                       status={currentStatus}
-                      error={error || undefined}
+                      error={error !== null ? error : ''}
                       showBadge={true}
                     />
                     {uploadProgress > 0 && (
@@ -1035,7 +1102,7 @@ export default function Home() {
                       <h3 className="text-lg font-semibold">Transcription Result</h3>
                       <TranscriptionStatus 
                         status={currentStatus}
-                        error={error || undefined}
+                        error={error !== null ? error : ''}
                         showBadge={true}
                       />
                     </div>
@@ -1115,7 +1182,7 @@ export default function Home() {
                       </div>
                     </div>
                     <div 
-                      className="flex-1 overflow-y-auto pb-6"
+                      className="flex-1 overflow-y-auto pb-6 px-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-gray-600"
                       style={{ height: 'calc(100% - 8rem)' }}
                     >
                       {isLoadingHistory ? (
@@ -1123,7 +1190,7 @@ export default function Home() {
                           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
                         </div>
                       ) : !filteredHistory || filteredHistory.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-64 text-center px-4">
+                        <div className="flex flex-col items-center justify-center h-64 text-center">
                           {!hasTranscriptions ? (
                             <>
                               <DocumentTextIcon className="h-16 w-16 text-gray-500 mb-4" />
@@ -1139,29 +1206,29 @@ export default function Home() {
                           )}
                         </div>
                       ) : (
-                        <div className="space-y-4">
+                        <div className="space-y-4 pt-4 pb-4">
                           {filteredHistory.map((item) => (
                             <motion.div
                               key={item.id}
                               initial={{ opacity: 0 }}
                               animate={{ opacity: 1 }}
                               className={clsx(
-                                "bg-gray-700 rounded-lg p-4 space-y-2",
+                                "bg-gray-700 rounded-lg p-4 space-y-2 group",
                                 item === filteredHistory[0] && "mt-2",
                                 item === filteredHistory[filteredHistory.length - 1] && "mb-6"
                               )}
                             >
-                              <div className="flex items-center justify-between relative">
+                              <div className="flex items-center justify-between relative mb-6">
                                 <p className="text-white break-words line-clamp-3 pr-8 w-full text-center">
                                   {item.text || (item.status === 'processing' ? 'Please wait, transcription is still processing...' : 'No transcription available')}
                                 </p>
-                                {item.error && (
+                                {item.error && item.error !== 'No transcription available' && (
                                   <p className="text-red-400 text-sm mt-2">
                                     Error: {item.error}
                                   </p>
                                 )}
                               </div>
-                              <div className="flex items-center justify-between mt-6">
+                              <div className="flex items-center justify-between mt-8">
                                 <div className="flex items-center gap-2 text-sm text-gray-400 flex-wrap">
                                   <span>{new Date(item.created_at).toLocaleString()}</span>
                                   {item.language_code && (
@@ -1171,27 +1238,29 @@ export default function Home() {
                                     </>
                                   )}
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center space-x-2">
                                   <div className="relative flex items-center gap-2 w-[50px] justify-end">
-                                    <button
-                                      onClick={() => {
-                                        navigator.clipboard.writeText(item.text);
-                                        const tooltip = document.getElementById(`copy-tooltip-${item.id}`);
-                                        const button = document.getElementById(`copy-button-${item.id}`);
-                                        if (tooltip && button) {
-                                          tooltip.style.display = 'block';
-                                          button.style.display = 'none';
-                                          setTimeout(() => {
-                                            tooltip.style.display = 'none';
-                                            button.style.display = 'flex';
-                                          }, 2000);
-                                        }
-                                      }}
-                                      id={`copy-button-${item.id}`}
-                                      className="text-gray-400 hover:text-white transition-colors flex items-center gap-2 opacity-0 group-hover:opacity-100"
-                                    >
-                                      <ClipboardDocumentIcon className="h-5 w-5" />
-                                    </button>
+                                    {item.status === 'completed' && item.text && item.text.trim() !== '' && (
+                                      <button
+                                        onClick={() => {
+                                          navigator.clipboard.writeText(item.text);
+                                          const tooltip = document.getElementById(`copy-tooltip-${item.id}`);
+                                          const button = document.getElementById(`copy-button-${item.id}`);
+                                          if (tooltip && button) {
+                                            tooltip.style.display = 'block';
+                                            button.style.display = 'none';
+                                            setTimeout(() => {
+                                              tooltip.style.display = 'none';
+                                              button.style.display = 'flex';
+                                            }, 2000);
+                                          }
+                                        }}
+                                        id={`copy-button-${item.id}`}
+                                        className="text-gray-400 hover:text-white transition-colors flex items-center gap-2 opacity-0 group-hover:opacity-100"
+                                      >
+                                        <ClipboardDocumentIcon className="h-5 h-5" />
+                                      </button>
+                                    )}
                                     <div
                                       id={`copy-tooltip-${item.id}`}
                                       className="hidden text-sm text-gray-400"
@@ -1200,7 +1269,8 @@ export default function Home() {
                                     </div>
                                   </div>
                                   <TranscriptionStatus 
-                                    status={item.status}
+                                    status={(!item.text || item.text.trim() === '') ? 'error' : item.status}
+                                    error={item.error && item.error !== 'No transcription available' ? item.error : ''}
                                   />
                                 </div>
                               </div>
@@ -1219,98 +1289,108 @@ export default function Home() {
                 "relative w-full",
                 Object.values(statusCounts).some(count => count > 0) ? "mt-4" : "mt-0"
               )}>
-                <div className="flex justify-between items-center mb-4 cursor-pointer group"
+                <div className="px-4">
+                  <div className="flex justify-between items-center mb-4 cursor-pointer"
                      onClick={() => setShowPreviousTranscriptions(!showPreviousTranscriptions)}>
-                  <div className="flex-1" />
-                  <h2 className="text-2xl font-semibold text-gray-200 flex-1 text-center group-hover:text-white transition-colors">
-                    Previous Transcriptions
-                  </h2>
-                  <div className="flex-1 flex justify-end">
-                    <button
-                      className="text-gray-400 hover:text-white p-1.5 rounded-full bg-gray-700/50 hover:bg-gray-600/50 transition-all"
-                    >
-                      {showPreviousTranscriptions ? (
-                        <ChevronUpIcon className="h-5 w-5 transform transition-transform duration-200" />
-                      ) : (
-                        <ChevronDownIcon className="h-5 w-5 transform transition-transform duration-200" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-                {showPreviousTranscriptions && Object.values(history).flat().length > 0 && (
-                  <div className="space-y-4">
-                    {Object.values(history).flat().slice(0, 5).map((item) => (
-                      <motion.div
-                        key={item.id}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className={clsx(
-                          "p-4 bg-gray-800 rounded-lg flex flex-col group relative hover:bg-gray-700/50 transition-colors",
-                          "max-h-40 overflow-hidden"
-                        )}
+                    <div className="flex-1" />
+                    <h2 className="text-2xl font-semibold text-gray-200 flex-1 text-center group-hover:text-white transition-colors">
+                      Previous Transcriptions ({latestCompletedTranscriptions.length > 0 
+                        ? `Showing latest ${latestCompletedTranscriptions.length} completed` 
+                        : 'No completed transcriptions yet'})
+                    </h2>
+                    <div className="flex-1 flex justify-end">
+                      <button
+                        className="text-gray-400 hover:text-white p-1.5 rounded-full bg-gray-700/50 hover:bg-gray-600/50 transition-all"
                       >
-                        <div className="flex items-center justify-between relative">
-                          <p className="text-gray-200 flex-1 pr-8 line-clamp-3">
-                            {item.text}
-                          </p>
-                        </div>
-                        <div className="flex items-center justify-between mt-6">
-                          <div className="flex items-center gap-2 text-sm text-gray-400 flex-wrap">
-                            <span>{new Date(item.created_at).toLocaleString()}</span>
-                            {item.language_code && (
-                              <>
-                                <span>•</span>
-                                <span>{item.language_code.toUpperCase()}</span>
-                              </>
-                            )}
+                        {showPreviousTranscriptions ? (
+                          <ChevronUpIcon className="h-5 w-5 transform transition-transform duration-200" />
+                        ) : (
+                          <ChevronDownIcon className="h-5 w-5 transform transition-transform duration-200" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  {showPreviousTranscriptions && latestCompletedTranscriptions.length > 0 && (
+                    <div className="space-y-4 pt-4 pb-4">
+                      {latestCompletedTranscriptions.map((item) => (
+                        <motion.div
+                          key={item.id}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className={clsx(
+                            "p-4 bg-gray-800 rounded-lg flex flex-col group relative hover:bg-gray-700/50 transition-colors",
+                            "max-h-40 overflow-hidden"
+                          )}
+                        >
+                          <div className="flex items-center justify-between relative">
+                            <p className="text-gray-200 flex-1 pr-8 line-clamp-3">
+                              {item.text}
+                            </p>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <div className="relative flex items-center gap-2">
-                              <button
-                                onClick={() => {
-                                  navigator.clipboard.writeText(item.text);
-                                  const tooltip = document.getElementById(`copy-tooltip-${item.id}`);
-                                  const button = document.getElementById(`copy-button-${item.id}`);
-                                  if (tooltip && button) {
-                                    tooltip.style.display = 'block';
-                                    button.style.display = 'none';
-                                    setTimeout(() => {
-                                      tooltip.style.display = 'none';
-                                      button.style.display = 'flex';
-                                    }, 2000);
-                                  }
-                                }}
-                                id={`copy-button-${item.id}`}
-                                className="text-gray-400 hover:text-white transition-colors flex items-center gap-2 opacity-0 group-hover:opacity-100"
-                              >
-                                <ClipboardDocumentIcon className="h-5 w-5" />
-                              </button>
-                              <div
-                                id={`copy-tooltip-${item.id}`}
-                                className="hidden text-sm text-gray-400"
-                              >
-                                Copied!
+                          <div className="flex items-center justify-between mt-8">
+                            <div className="flex items-center gap-2 text-sm text-gray-400 flex-wrap">
+                              <span>{new Date(item.created_at).toLocaleString()}</span>
+                              {item.language_code && (
+                                <>
+                                  <span>•</span>
+                                  <span>{item.language_code.toUpperCase()}</span>
+                                </>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="relative flex items-center gap-2">
+                                {item.status === 'completed' && item.text && item.text.trim() !== '' && (
+                                  <button
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(item.text);
+                                      const tooltip = document.getElementById(`copy-tooltip-${item.id}`);
+                                      const button = document.getElementById(`copy-button-${item.id}`);
+                                      if (tooltip && button) {
+                                        tooltip.style.display = 'block';
+                                        button.style.display = 'none';
+                                        setTimeout(() => {
+                                          tooltip.style.display = 'none';
+                                          button.style.display = 'flex';
+                                        }, 2000);
+                                      }
+                                    }}
+                                    id={`copy-button-${item.id}`}
+                                    className="text-gray-400 hover:text-white transition-colors flex items-center gap-2 opacity-0 group-hover:opacity-100"
+                                  >
+                                    <ClipboardDocumentIcon className="h-5 w-5" />
+                                  </button>
+                                )}
+                                <div
+                                  id={`copy-tooltip-${item.id}`}
+                                  className="hidden text-sm text-gray-400"
+                                >
+                                  Copied!
+                                </div>
                               </div>
+                              <TranscriptionStatus 
+                                status={(!item.text || item.text.trim() === '') ? 'error' : item.status}
+                                error={item.error && item.error !== 'No transcription available' ? item.error : ''}
+                              />
                             </div>
                           </div>
+                        </motion.div>
+                      ))}
+                      {showViewAllButton && (
+                        <div className="flex justify-center mt-4">
+                          <button
+                            onClick={() => {
+                              setActiveTab('all');
+                              setShowHistory(true);
+                            }}
+                            className="px-4 py-2 text-sm text-gray-300 hover:text-white bg-gray-700/50 hover:bg-gray-600/50 rounded-full transition-all"
+                          >
+                            View All Transcriptions
+                          </button>
                         </div>
-                      </motion.div>
-                    ))}
-                    {Object.values(history).flat().length > 5 && (
-                      <div className="flex justify-center mt-4">
-                        <button
-                          onClick={() => {
-                            setActiveTab('all');
-                            setShowHistory(true);
-                          }}
-                          className="px-4 py-2 text-sm text-gray-300 hover:text-white bg-gray-700/50 hover:bg-gray-600/50 rounded-full transition-all"
-                        >
-                          View All Transcriptions
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
