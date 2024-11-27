@@ -12,10 +12,25 @@ Transform your voice and audio into text effortlessly using AssemblyAI's powerfu
 - **Backend Repository**: [https://github.com/dehyabi/textor-ai](https://github.com/dehyabi/textor-ai)
 
 ## 📸 Screenshots
-![Modern Interface](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/qh5nat7zn1c1huzfxkt2.png)
-![Transcription Process](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/nmrmosxphhro57t9idk4.png)
-![Results View](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/mq0361vtjtdekv0rqrog.png)
-![History Modal](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/meso773iq2w5g55z3hbj.png)
+![Image description](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/rbwi16lvpxe62r70k47k.png)
+
+![Image description](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/43tctnx7v83klimt4qf3.png)
+
+![Image description](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/lat53g28rcx4r3nl7er2.png)
+
+![Image description](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/stp3tfkdwqchojt04atq.png)
+
+![Image description](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/ccwkr5nfzky6f1b89nxw.png)
+
+![Image description](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/kjb7oucheiopznnf58rg.png)
+
+![Image description](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/1a6zzn30ct4bt3je4c8g.png)
+
+![Image description](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/khfagt38gbo80fhdibi1.png)
+
+![Image description](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/d1gte6y1qmieqqx7hwj1.png)
+
+![Image description](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/07lrwmqwslus5kwm09ic.png)
 
 ## 🛠️ Technical Stack
 
