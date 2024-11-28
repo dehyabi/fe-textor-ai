@@ -237,16 +237,16 @@ export default function Home() {
   };
 
   const handleStartTranscription = async () => {
-    if (!selectedLanguage) {
-      setLanguageError('Please select a language before uploading');
-      return;
-    }
-    setLanguageError('');
-    
     if (!selectedFile) {
       setError('Please select an audio file first');
       return;
     }
+
+    if (!selectedLanguage) {
+      setLanguageError('Please select a language before transcribing');
+      return;
+    }
+    setLanguageError('');
 
     try {
       setIsLoading(true);
@@ -268,9 +268,10 @@ export default function Home() {
 
       setCurrentStatus('completed');
       setAudioPreview(null);
+      setSelectedFile(null);
       setTranscription('');
       await loadTranscriptionHistory();
-      setShowHistory(true); // Show history modal
+      setShowHistory(true);
       if (!keepLanguage) {
         setSelectedLanguage('');
       }
@@ -280,6 +281,7 @@ export default function Home() {
       setCurrentStatus('error');
     } finally {
       setIsLoading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -334,12 +336,88 @@ export default function Home() {
           });
           setIsRecording(false);
           setRecordingDuration(0);
-          if (audioBlob) {
-            await processAudioFile(audioBlob);
+
+          // Convert to WAV and set up preview
+          const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const arrayBuffer = await audioBlob.arrayBuffer();
+          const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+          
+          // Create WAV file
+          const wavBlob = await new Promise<Blob>((resolve) => {
+            const numberOfChannels = audioBuffer.numberOfChannels;
+            const length = audioBuffer.length;
+            const sampleRate = audioBuffer.sampleRate;
+            const wavBuffer = new ArrayBuffer(44 + length * 2);
+            const view = new DataView(wavBuffer);
+            
+            // Write WAV header
+            const writeString = (view: DataView, offset: number, string: string) => {
+              for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+              }
+            };
+
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, 36 + length * 2, true);
+            writeString(view, 8, 'WAVE');
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);
+            view.setUint16(22, numberOfChannels, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 4, true);
+            view.setUint16(32, numberOfChannels * 2, true);
+            view.setUint16(34, 16, true);
+            writeString(view, 36, 'data');
+            view.setUint32(40, length * 2, true);
+
+            const channel = audioBuffer.getChannelData(0);
+            let offset = 44;
+            for (let i = 0; i < length; i++) {
+              const sample = Math.max(-1, Math.min(1, channel[i]));
+              view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+              offset += 2;
+            }
+
+            resolve(new Blob([wavBuffer], { type: 'audio/wav' }));
+          });
+
+          // Check WAV file size
+          if (wavBlob.size / (1024 * 1024) > 5) {
+            throw new Error('Recorded audio exceeds 5MB limit. Try recording a shorter audio.');
           }
-        } catch (error) {
+
+          // Create a File object from the WAV blob
+          const wavFile = new File([wavBlob], 'recording.wav', { type: 'audio/wav' });
+          setSelectedFile(wavFile);
+
+          const audioUrl = URL.createObjectURL(wavBlob);
+          setAudioPreview(audioUrl);
+          setDuration(audioBuffer.duration);
+          setCurrentTime(0);
+          
+          stream.getTracks().forEach(track => track.stop());
+          setIsLoading(false);
+          stopRecordingTimer();
+          
+          // Ensure audio element is properly updated
+          if (audioRef.current) {
+            audioRef.current.src = audioUrl;
+            audioRef.current.load();
+          }
+          
+          console.log('Audio processed:', {
+            duration: audioBuffer.duration,
+            sampleRate: audioBuffer.sampleRate,
+            numberOfChannels: audioBuffer.numberOfChannels
+          });
+        } catch (error: unknown) {
           console.error('Error processing audio file:', error);
-          setError(error instanceof Error ? error.message : 'Failed to process audio file. Please try again.');
+          if (error instanceof Error) {
+            setError(error.message);
+          } else {
+            setError('Failed to process audio file. Please try again.');
+          }
         }
       };
 
@@ -904,11 +982,27 @@ export default function Home() {
                       <div className="flex items-center space-x-2">
                         <motion.button
                           onClick={handleStartTranscription}
-                          className="px-4 py-2 bg-purple-500 hover:bg-purple-600 rounded-lg text-white transition-colors"
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
+                          disabled={isLoading}
+                          className={clsx(
+                            "px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200",
+                            isLoading
+                              ? "bg-purple-500/50 text-white cursor-not-allowed"
+                              : "bg-purple-500 text-white hover:bg-purple-600"
+                          )}
+                          whileHover={!isLoading ? { scale: 1.05 } : {}}
+                          whileTap={!isLoading ? { scale: 0.95 } : {}}
                         >
-                          Transcribe
+                          {isLoading ? (
+                            <div className="flex items-center gap-2">
+                              <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                              <span>Transcribing...</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <DocumentTextIcon className="w-4 h-4" />
+                              <span>Transcribe</span>
+                            </div>
+                          )}
                         </motion.button>
                         <motion.button
                           onClick={handleCancelAudio}
@@ -972,6 +1066,15 @@ export default function Home() {
                       preload="metadata"
                       className="hidden"
                     />
+
+                    {uploadProgress > 0 && uploadProgress < 100 && (
+                      <div className="w-full bg-gray-700 rounded-full h-1.5">
+                        <div 
+                          className="bg-purple-500 h-1.5 rounded-full transition-all duration-300"
+                          style={{ width: `${uploadProgress}%` }}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
