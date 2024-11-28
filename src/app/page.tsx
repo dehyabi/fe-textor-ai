@@ -52,12 +52,7 @@ export default function Home() {
   const [transcription, setTranscription] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [history, setHistory] = useState<TranscriptionsByStatus>({
-    queued: [],
-    processing: [],
-    completed: [],
-    error: []
-  });
+  const [history, setHistory] = useState<TranscriptionsByStatus | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [audioPreview, setAudioPreview] = useState<string | null>(null);
@@ -78,158 +73,66 @@ export default function Home() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [recordingDuration, setRecordingDuration] = useState(0);
-  const [selectedLanguage, setSelectedLanguage] = useState<string>('');
+  const [selectedLanguage, setSelectedLanguage] = useState('en');
   const [keepLanguage, setKeepLanguage] = useState(false);
   const [languageError, setLanguageError] = useState<string>('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [showPreviousTranscriptions, setShowPreviousTranscriptions] = useState(false);
+  const [showPreviousTranscriptions, setShowPreviousTranscriptions] = useState(true);
+  const [showViewAllButton, setShowViewAllButton] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const itemsPerPage = 5;
 
   const filteredHistory = useMemo(() => {
     if (!history) return [];
-    
-    const allTranscriptions = Object.values(history).flat();
-    
-    // First, update the status of transcriptions with no text
-    const processedTranscriptions = allTranscriptions.map(item => {
-      if (!item.text || item.text.trim() === '') {
+    return Object.values(history).flat().map(item => {
+      // Only mark as error if there's an actual error message
+      if (item.error) {
         return {
           ...item,
-          status: 'error',
-          error: 'No transcription available'
+          status: 'error'
         };
       }
+      // For empty text without error, keep the original status
       return item;
     });
-    
-    if (activeTab === 'all') {
-      return processedTranscriptions
-        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    }
-    
-    return processedTranscriptions
-      .filter(item => item.status === activeTab)
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  }, [history, activeTab]);
-
-  const paginatedHistory = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    return filteredHistory.slice(startIndex, endIndex);
-  }, [filteredHistory, currentPage]);
-
-  const totalPages = useMemo(() => {
-    return Math.ceil(filteredHistory.length / itemsPerPage);
-  }, [filteredHistory]);
+  }, [history]);
 
   const hasTranscriptions = useMemo(() => {
-    return Object.values(statusCounts).some(count => count > 0);
-  }, [statusCounts]);
+    return filteredHistory && filteredHistory.length > 0;
+  }, [filteredHistory]);
 
   const latestCompletedTranscriptions = useMemo(() => {
     if (!history) return [];
-    
-    const allTranscriptions = Object.values(history).flat();
-    
-    return allTranscriptions
-      .filter(item => 
-        item.status === 'completed' && 
-        item.text && 
-        item.text.trim() !== ''
-      )
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-      .slice(0, 5);
-  }, [history]);
-
-  const showViewAllButton = useMemo(() => {
-    if (!history) return false;
-    const completedCount = Object.values(history)
+    const completed = Object.values(history)
       .flat()
-      .filter(item => 
-        item.status === 'completed' && 
-        item.text && 
-        item.text.trim() !== ''
-      ).length;
-    return completedCount > 5;
-  }, [history]);
-
-  useEffect(() => {
-    if (history) {
-      const allTranscriptions = Object.values(history).flat();
-      
-      // Count transcriptions by status, treating empty text as errors
-      const counts = allTranscriptions.reduce((acc, item) => {
-        const status = (!item.text || item.text.trim() === '') ? 'error' : item.status;
-        acc[status] = (acc[status] || 0) + 1;
-        return acc;
-      }, {
-        queued: 0,
-        processing: 0,
-        completed: 0,
-        error: 0
-      } as TranscriptionStatusCounts);
-      
-      setStatusCounts(counts);
-    }
-  }, [history]);
-
-  useEffect(() => {
-    if (showHistory) {
-      loadTranscriptionHistory();
-    }
-  }, [showHistory]);
-
-  useEffect(() => {
-    if (showHistory) {
-      document.documentElement.style.overflow = 'hidden';
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.documentElement.style.overflow = '';
-      document.body.style.overflow = '';
-    }
+      .filter(item => item.status === 'completed')
+      .slice(0, 3);
     
-    return () => {
-      document.documentElement.style.overflow = '';
-      document.body.style.overflow = '';
+    // Show view all button if there are more than 3 completed transcriptions
+    setShowViewAllButton(Object.values(history).flat().filter(item => item.status === 'completed').length > 3);
+    
+    return completed;
+  }, [history]);
+
+  const statusCountsMemo = useMemo(() => {
+    if (!statusCounts) return {
+      queued: 0,
+      processing: 0,
+      completed: 0,
+      error: 0
     };
-  }, [showHistory]);
+    return statusCounts;
+  }, [statusCounts]);
 
   useEffect(() => {
-    if (audioRef.current) {
-      console.log('Audio states:', {
-        currentTime,
-        duration,
-        isPlaying,
-        audioPreview: !!audioPreview
-      });
-    }
-  }, [currentTime, duration, isPlaying, audioPreview]);
+    fetchHistory(currentPage);
+  }, [currentPage, activeTab]);
 
-  useEffect(() => {
-    return () => {
-      if (audioPreview) {
-        URL.revokeObjectURL(audioPreview);
-      }
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-        mediaRecorderRef.current.stop();
-      }
-      if (chunksRef.current) {
-        chunksRef.current = [];
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    // Show previous transcriptions when modal is closed and there are transcriptions
-    if (!showHistory && history && Object.values(history).flat().length > 0) {
-      setShowPreviousTranscriptions(true);
-    }
-  }, [showHistory, history]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [activeTab]);
+  const handleTabChange = (tab: typeof activeTab) => {
+    setActiveTab(tab);
+    setCurrentPage(1); // Reset to first page when changing tabs
+  };
 
   const loadTranscriptionHistory = async () => {
     if (isLoadingHistory) return;
@@ -323,7 +226,7 @@ export default function Home() {
         setDuration(tempAudio.duration);
         setCurrentTime(0);
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error processing audio file:', error);
       setError(error.message || 'Failed to process audio file. Please try again.');
     }
@@ -783,9 +686,9 @@ export default function Home() {
 
   const getTabCount = (status: 'all' | 'queued' | 'processing' | 'completed' | 'error') => {
     if (status === 'all') {
-      return Object.values(statusCounts).reduce((sum, count) => sum + count, 0);
+      return Object.values(statusCountsMemo).reduce((sum, count) => sum + count, 0);
     }
-    return statusCounts[status] || 0;
+    return statusCountsMemo[status] || 0;
   };
 
   const renderTab = (status: 'all' | 'queued' | 'processing' | 'completed' | 'error', label: string) => {
@@ -837,6 +740,40 @@ export default function Home() {
     }
   };
 
+  const fetchHistory = async (page: number = currentPage) => {
+    try {
+      setIsLoadingHistory(true);
+      setError(null);
+      const response = await getTranscriptionHistory(page, itemsPerPage, activeTab);
+      
+      if (!response || !response.transcriptions) {
+        throw new Error('Invalid response from server');
+      }
+      
+      setHistory(response.transcriptions);
+      setStatusCounts(response.status_counts || {
+        queued: 0,
+        processing: 0,
+        completed: 0,
+        error: 0
+      });
+      setTotalPages(response.total_pages || 1);
+      setCurrentPage(response.current_page || page);
+    } catch (error) {
+      console.error('Error fetching history:', error);
+      setError('Failed to fetch transcription history');
+      setHistory(null);
+      setStatusCounts({
+        queued: 0,
+        processing: 0,
+        completed: 0,
+        error: 0
+      });
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -862,7 +799,7 @@ export default function Home() {
 
       <div className={clsx(
         "relative container mx-auto px-4 max-w-4xl",
-        Object.values(statusCounts).some(count => count > 0) ? "py-8" : "pt-8 pb-4"
+        Object.values(statusCountsMemo).some(count => count > 0) ? "py-8" : "pt-8 pb-4"
       )}>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -1093,7 +1030,6 @@ export default function Home() {
                   <div className="mt-4 space-y-4">
                     <TranscriptionStatus 
                       status={currentStatus}
-                      error={error !== null ? error : ''}
                       showBadge={true}
                     />
                     {uploadProgress > 0 && (
@@ -1119,7 +1055,6 @@ export default function Home() {
                       <h3 className="text-lg font-semibold">Transcription Result</h3>
                       <TranscriptionStatus 
                         status={currentStatus}
-                        error={error !== null ? error : ''}
                         showBadge={true}
                       />
                     </div>
@@ -1191,11 +1126,61 @@ export default function Home() {
                     </div>
                     <div className="px-6 pt-4 border-b border-gray-700">
                       <div className="flex gap-2 overflow-x-auto pb-4 hide-scrollbar">
-                        {renderTab('all', 'All')}
-                        {renderTab('completed', 'Completed')}
-                        {renderTab('processing', 'Processing')}
-                        {renderTab('queued', 'Queued')}
-                        {renderTab('error', 'Error')}
+                        <button
+                          onClick={() => handleTabChange('all')}
+                          className={clsx(
+                            "px-4 py-2 rounded-lg transition-all duration-200",
+                            activeTab === 'all'
+                              ? "bg-purple-500 text-white"
+                              : "text-gray-500 hover:bg-purple-500/10"
+                          )}
+                        >
+                          All
+                        </button>
+                        <button
+                          onClick={() => handleTabChange('completed')}
+                          className={clsx(
+                            "px-4 py-2 rounded-lg transition-all duration-200",
+                            activeTab === 'completed'
+                              ? "bg-purple-500 text-white"
+                              : "text-gray-500 hover:bg-purple-500/10"
+                          )}
+                        >
+                          Completed
+                        </button>
+                        <button
+                          onClick={() => handleTabChange('processing')}
+                          className={clsx(
+                            "px-4 py-2 rounded-lg transition-all duration-200",
+                            activeTab === 'processing'
+                              ? "bg-purple-500 text-white"
+                              : "text-gray-500 hover:bg-purple-500/10"
+                          )}
+                        >
+                          Processing
+                        </button>
+                        <button
+                          onClick={() => handleTabChange('queued')}
+                          className={clsx(
+                            "px-4 py-2 rounded-lg transition-all duration-200",
+                            activeTab === 'queued'
+                              ? "bg-purple-500 text-white"
+                              : "text-gray-500 hover:bg-purple-500/10"
+                          )}
+                        >
+                          Queued
+                        </button>
+                        <button
+                          onClick={() => handleTabChange('error')}
+                          className={clsx(
+                            "px-4 py-2 rounded-lg transition-all duration-200",
+                            activeTab === 'error'
+                              ? "bg-purple-500 text-white"
+                              : "text-gray-500 hover:bg-purple-500/10"
+                          )}
+                        >
+                          Error
+                        </button>
                       </div>
                     </div>
                     <div 
@@ -1203,8 +1188,8 @@ export default function Home() {
                       style={{ height: 'calc(100% - 8rem)' }}
                     >
                       {isLoadingHistory ? (
-                        <div className="flex justify-center items-center h-32">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+                        <div className="flex items-center justify-center h-32">
+                          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500"></div>
                         </div>
                       ) : !filteredHistory || filteredHistory.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-64 text-center">
@@ -1212,17 +1197,22 @@ export default function Home() {
                             <>
                               <DocumentTextIcon className="w-16 h-16 text-gray-600 mb-4" />
                               <p className="text-gray-400">No transcriptions yet</p>
+                              <p className="text-gray-500 text-sm mt-2">Record or upload audio to get started</p>
                             </>
                           ) : (
                             <>
                               <FolderIcon className="w-16 h-16 text-gray-600 mb-4" />
-                              <p className="text-gray-400">No transcriptions found in this category</p>
+                              <p className="text-gray-400">
+                                {activeTab === 'all' 
+                                  ? 'No transcriptions found'
+                                  : `No ${activeTab} transcriptions`}
+                              </p>
                             </>
                           )}
                         </div>
                       ) : (
                         <div className="space-y-4 mt-4">
-                          {paginatedHistory.map((item, index) => (
+                          {filteredHistory.map((item, index) => (
                             <motion.div
                               key={item.id}
                               initial={{ opacity: 0, y: 20 }}
@@ -1232,13 +1222,8 @@ export default function Home() {
                             >
                               <div className="flex items-center justify-between relative mb-6">
                                 <p className="text-white break-words line-clamp-3 pr-8 w-full text-center">
-                                  {item.text || (item.status === 'processing' ? 'Please wait, transcription is still processing...' : 'No transcription available')}
+                                  {item.error ? item.error : item.text}
                                 </p>
-                                {item.error && item.error !== 'No transcription available' && (
-                                  <p className="text-red-400 text-sm mt-2">
-                                    Error: {item.error}
-                                  </p>
-                                )}
                               </div>
                               <div className="flex items-center justify-between mt-8">
                                 <div className="flex items-center gap-2 text-sm text-gray-400 flex-wrap">
@@ -1250,39 +1235,35 @@ export default function Home() {
                                     </>
                                   )}
                                 </div>
-                                <div className="flex items-center space-x-2">
+                                <div className="flex items-center gap-2">
                                   <div className="relative flex items-center gap-2 w-[50px] justify-end">
                                     {item.status === 'completed' && item.text && item.text.trim() !== '' && (
                                       <button
                                         onClick={() => {
                                           navigator.clipboard.writeText(item.text);
-                                          const tooltip = document.getElementById(`copy-tooltip-${item.id}`);
-                                          const button = document.getElementById(`copy-button-${item.id}`);
-                                          if (tooltip && button) {
-                                            tooltip.style.display = 'block';
-                                            button.style.display = 'none';
-                                            setTimeout(() => {
-                                              tooltip.style.display = 'none';
-                                              button.style.display = 'flex';
-                                            }, 2000);
-                                          }
+                                          setCopiedId(item.id);
+                                          setCopySuccess(true);
+                                          setTimeout(() => {
+                                            setCopiedId(null);
+                                            setCopySuccess(false);
+                                          }, 2000);
                                         }}
-                                        id={`copy-button-${item.id}`}
-                                        className="text-gray-400 hover:text-white transition-colors flex items-center gap-2 opacity-0 group-hover:opacity-100"
+                                        className="text-gray-400 hover:text-purple-400 transition-colors"
                                       >
-                                        <ClipboardDocumentIcon className="h-5 h-5" />
+                                        <ClipboardDocumentIcon className="w-5 h-5" />
                                       </button>
                                     )}
                                     <div
-                                      id={`copy-tooltip-${item.id}`}
-                                      className="hidden text-sm text-gray-400"
+                                      className={clsx(
+                                        "absolute right-0 -top-8 bg-gray-800 text-white px-2 py-1 rounded text-sm transition-all",
+                                        copiedId === item.id ? "opacity-100" : "opacity-0"
+                                      )}
                                     >
                                       Copied!
                                     </div>
                                   </div>
                                   <TranscriptionStatus 
                                     status={(!item.text || item.text.trim() === '') ? 'error' : item.status}
-                                    error={item.error && item.error !== 'No transcription available' ? item.error : ''}
                                   />
                                 </div>
                               </div>
@@ -1292,7 +1273,7 @@ export default function Home() {
                             <Pagination
                               currentPage={currentPage}
                               totalPages={totalPages}
-                              onPageChange={setCurrentPage}
+                              onPageChange={(page) => setCurrentPage(page)}
                             />
                           )}
                         </div>
@@ -1303,10 +1284,10 @@ export default function Home() {
               )}
             </AnimatePresence>
 
-            {Object.values(statusCounts).some(count => count > 0) && (
+            {Object.values(statusCountsMemo).some(count => count > 0) && (
               <div className={clsx(
                 "relative w-full",
-                Object.values(statusCounts).some(count => count > 0) ? "mt-4" : "mt-0"
+                Object.values(statusCountsMemo).some(count => count > 0) ? "mt-4" : "mt-0"
               )}>
                 <div className="px-4">
                   <div className="flex justify-between items-center mb-4 cursor-pointer"
@@ -1341,7 +1322,7 @@ export default function Home() {
                         >
                           <div className="flex items-center justify-between relative">
                             <p className="text-gray-200 flex-1 pr-8 line-clamp-3">
-                              {item.text}
+                              {item.error ? item.error : item.text}
                             </p>
                           </div>
                           <div className="flex items-center justify-between mt-8">
@@ -1360,33 +1341,29 @@ export default function Home() {
                                   <button
                                     onClick={() => {
                                       navigator.clipboard.writeText(item.text);
-                                      const tooltip = document.getElementById(`copy-tooltip-${item.id}`);
-                                      const button = document.getElementById(`copy-button-${item.id}`);
-                                      if (tooltip && button) {
-                                        tooltip.style.display = 'block';
-                                        button.style.display = 'none';
-                                        setTimeout(() => {
-                                          tooltip.style.display = 'none';
-                                          button.style.display = 'flex';
-                                        }, 2000);
-                                      }
+                                      setCopiedId(item.id);
+                                      setCopySuccess(true);
+                                      setTimeout(() => {
+                                        setCopiedId(null);
+                                        setCopySuccess(false);
+                                      }, 2000);
                                     }}
-                                    id={`copy-button-${item.id}`}
-                                    className="text-gray-400 hover:text-white transition-colors flex items-center gap-2 opacity-0 group-hover:opacity-100"
+                                    className="text-gray-400 hover:text-purple-400 transition-colors"
                                   >
-                                    <ClipboardDocumentIcon className="h-5 w-5" />
+                                    <ClipboardDocumentIcon className="h-5 h-5" />
                                   </button>
                                 )}
                                 <div
-                                  id={`copy-tooltip-${item.id}`}
-                                  className="hidden text-sm text-gray-400"
+                                  className={clsx(
+                                    "absolute right-0 -top-8 bg-gray-800 text-white px-2 py-1 rounded text-sm transition-all",
+                                    copiedId === item.id ? "opacity-100" : "opacity-0"
+                                  )}
                                 >
                                   Copied!
                                 </div>
                               </div>
                               <TranscriptionStatus 
                                 status={(!item.text || item.text.trim() === '') ? 'error' : item.status}
-                                error={item.error && item.error !== 'No transcription available' ? item.error : ''}
                               />
                             </div>
                           </div>
@@ -1416,7 +1393,7 @@ export default function Home() {
       {/* Credit Footer */}
       <div className={clsx(
         "relative container mx-auto px-4 max-w-4xl",
-        Object.values(statusCounts).some(count => count > 0) ? "mt-4" : "mt-2"
+        Object.values(statusCountsMemo).some(count => count > 0) ? "mt-4" : "mt-2"
       )}>
         <footer className="text-center text-gray-500 text-sm p-4 bg-white/5 backdrop-blur-sm border-t border-gray-800 rounded-lg">
           Built with ❤️ in Indonesia by{' '}

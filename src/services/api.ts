@@ -165,14 +165,22 @@ export const uploadAudioForTranscription = async (
   throw new Error('Failed to upload after multiple attempts. Please try again later.');
 };
 
-export const getTranscriptionHistory = async (): Promise<TranscriptionHistoryResponse> => {
+export const getTranscriptionHistory = async (
+  page: number = 1,
+  limit: number = 5,
+  status: string = 'all'
+): Promise<TranscriptionHistoryResponse> => {
   try {
-    console.log('Fetching transcription history...');
-    const response = await api.get<TranscriptionHistoryResponse>('/api/transcribe/');
-    console.log('History response:', response.data);
+    const response = await api.get('/api/transcribe/', {
+      params: {
+        page,
+        limit,
+        status: status === 'all' ? undefined : status
+      }
+    });
     return response.data;
-  } catch (error: any) {
-    console.error('Get history error:', error);
+  } catch (error) {
+    console.error('Error fetching transcription history:', error);
     throw error;
   }
 };
