@@ -49,6 +49,9 @@ interface TranscriptionData {
 export interface TranscriptionHistoryResponse {
   transcriptions: TranscriptionsByStatus;
   status_counts: TranscriptionStatusCounts;
+  total_pages: number;
+  current_page: number;
+  total_count: number;
 }
 
 export interface SingleTranscriptionResponse {
@@ -178,7 +181,15 @@ export const getTranscriptionHistory = async (
         status: status === 'all' ? undefined : status
       }
     });
-    return response.data;
+
+    // Ensure we return pagination data
+    return {
+      transcriptions: response.data.transcriptions,
+      status_counts: response.data.status_counts,
+      total_pages: response.data.total_pages || Math.ceil(response.data.total_count / limit) || 1,
+      current_page: response.data.current_page || page,
+      total_count: response.data.total_count || 0
+    };
   } catch (error) {
     console.error('Error fetching transcription history:', error);
     throw error;

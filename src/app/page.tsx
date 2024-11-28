@@ -226,9 +226,13 @@ export default function Home() {
         setDuration(tempAudio.duration);
         setCurrentTime(0);
       });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error processing audio file:', error);
-      setError(error.message || 'Failed to process audio file. Please try again.');
+      if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError('Failed to process audio file. Please try again.');
+      }
     }
   };
 
@@ -324,97 +328,18 @@ export default function Home() {
 
       mediaRecorderRef.current.onstop = async () => {
         try {
-          const audioBlob = new Blob(chunksRef.current, { type: mimeType });
-          console.log('Initial recording:', {
-            type: audioBlob.type,
-            sizeInBytes: audioBlob.size,
-            sizeInMB: (audioBlob.size / (1024 * 1024)).toFixed(2),
-            chunks: chunksRef.current.length
+          const audioBlob = await new Promise<Blob>((resolve) => {
+            const blob = new Blob(chunksRef.current, { type: mimeType });
+            resolve(blob);
           });
-          
-          // Convert WebM to WAV for better compatibility
-          const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-          const arrayBuffer = await audioBlob.arrayBuffer();
-          const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-          
-          // Create WAV file
-          const wavBlob = await new Promise<Blob>((resolve) => {
-            const numberOfChannels = audioBuffer.numberOfChannels;
-            const length = audioBuffer.length;
-            const sampleRate = audioBuffer.sampleRate;
-            const wavBuffer = new ArrayBuffer(44 + length * 2);
-            const view = new DataView(wavBuffer);
-            
-            // Write WAV header
-            const writeString = (view: DataView, offset: number, string: string) => {
-              for (let i = 0; i < string.length; i++) {
-                view.setUint8(offset + i, string.charCodeAt(i));
-              }
-            };
-
-            writeString(view, 0, 'RIFF');
-            view.setUint32(4, 36 + length * 2, true);
-            writeString(view, 8, 'WAVE');
-            writeString(view, 12, 'fmt ');
-            view.setUint32(16, 16, true);
-            view.setUint16(20, 1, true);
-            view.setUint16(22, numberOfChannels, true);
-            view.setUint32(24, sampleRate, true);
-            view.setUint32(28, sampleRate * 4, true);
-            view.setUint16(32, numberOfChannels * 2, true);
-            view.setUint16(34, 16, true);
-            writeString(view, 36, 'data');
-            view.setUint32(40, length * 2, true);
-
-            const channel = audioBuffer.getChannelData(0);
-            let offset = 44;
-            for (let i = 0; i < length; i++) {
-              const sample = Math.max(-1, Math.min(1, channel[i]));
-              view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
-              offset += 2;
-            }
-
-            resolve(new Blob([wavBuffer], { type: 'audio/wav' }));
-          });
-
-          console.log('After WAV conversion:', {
-            type: wavBlob.type,
-            sizeInBytes: wavBlob.size,
-            sizeInMB: (wavBlob.size / (1024 * 1024)).toFixed(2)
-          });
-
-          // Check WAV file size
-          if (wavBlob.size / (1024 * 1024) > 5) {
-            throw new Error('Recorded audio exceeds 5MB limit. Try recording a shorter audio.');
+          setIsRecording(false);
+          setRecordingDuration(0);
+          if (audioBlob) {
+            await processAudioFile(audioBlob);
           }
-
-          // Create a File object from the WAV blob
-          const wavFile = new File([wavBlob], 'recording.wav', { type: 'audio/wav' });
-          setSelectedFile(wavFile);
-
-          const audioUrl = URL.createObjectURL(wavBlob);
-          setAudioPreview(audioUrl);
-          setDuration(audioBuffer.duration);
-          setCurrentTime(0);
-          
-          stream.getTracks().forEach(track => track.stop());
-          setIsLoading(false);
-          stopRecordingTimer();
-          
-          // Ensure audio element is properly updated
-          if (audioRef.current) {
-            audioRef.current.src = audioUrl;
-            audioRef.current.load();
-          }
-          
-          console.log('Audio processed:', {
-            duration: audioBuffer.duration,
-            sampleRate: audioBuffer.sampleRate,
-            numberOfChannels: audioBuffer.numberOfChannels
-          });
         } catch (error) {
-          console.error('Error processing audio:', error);
-          setError('Failed to process audio recording. Please try again.');
+          console.error('Error processing audio file:', error);
+          setError(error instanceof Error ? error.message : 'Failed to process audio file. Please try again.');
         }
       };
 
@@ -740,37 +665,118 @@ export default function Home() {
     }
   };
 
-  const fetchHistory = async (page: number = currentPage) => {
+  const fetchHistory = async (page: number) => {
     try {
       setIsLoadingHistory(true);
-      setError(null);
       const response = await getTranscriptionHistory(page, itemsPerPage, activeTab);
-      
-      if (!response || !response.transcriptions) {
-        throw new Error('Invalid response from server');
-      }
-      
       setHistory(response.transcriptions);
-      setStatusCounts(response.status_counts || {
-        queued: 0,
-        processing: 0,
-        completed: 0,
-        error: 0
-      });
-      setTotalPages(response.total_pages || 1);
-      setCurrentPage(response.current_page || page);
-    } catch (error) {
-      console.error('Error fetching history:', error);
-      setError('Failed to fetch transcription history');
-      setHistory(null);
       setStatusCounts({
-        queued: 0,
-        processing: 0,
-        completed: 0,
-        error: 0
+        queued: response.status_counts.queued || 0,
+        processing: response.status_counts.processing || 0,
+        completed: response.status_counts.completed || 0,
+        error: response.status_counts.error || 0
       });
+      setTotalPages(response.total_pages);
+      setCurrentPage(response.current_page);
+    } catch (error: unknown) {
+      console.error('Error fetching history:', error);
+      if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError('Failed to fetch transcription history');
+      }
     } finally {
       setIsLoadingHistory(false);
+    }
+  };
+
+  const processAudioFile = async (audioBlob: Blob) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      setCurrentStatus('queued');
+      setUploadProgress(0);
+
+      // Convert WebM to WAV
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const arrayBuffer = await audioBlob.arrayBuffer();
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      
+      // Create WAV file
+      const wavBlob = await new Promise<Blob>((resolve) => {
+        const numberOfChannels = audioBuffer.numberOfChannels;
+        const length = audioBuffer.length;
+        const sampleRate = audioBuffer.sampleRate;
+        const wavBuffer = new ArrayBuffer(44 + length * 2);
+        const view = new DataView(wavBuffer);
+        
+        // Write WAV header
+        const writeString = (view: DataView, offset: number, string: string) => {
+          for (let i = 0; i < string.length; i++) {
+            view.setUint8(offset + i, string.charCodeAt(i));
+          }
+        };
+
+        writeString(view, 0, 'RIFF');
+        view.setUint32(4, 36 + length * 2, true);
+        writeString(view, 8, 'WAVE');
+        writeString(view, 12, 'fmt ');
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, numberOfChannels, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * 4, true);
+        view.setUint16(32, numberOfChannels * 2, true);
+        view.setUint16(34, 16, true);
+        writeString(view, 36, 'data');
+        view.setUint32(40, length * 2, true);
+
+        const channel = audioBuffer.getChannelData(0);
+        let offset = 44;
+        for (let i = 0; i < length; i++) {
+          const sample = Math.max(-1, Math.min(1, channel[i]));
+          view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+          offset += 2;
+        }
+
+        resolve(new Blob([wavBuffer], { type: 'audio/wav' }));
+      });
+
+      console.log('Starting transcription:', {
+        originalType: audioBlob.type,
+        convertedType: 'audio/wav',
+        originalSize: formatFileSize(audioBlob.size),
+        convertedSize: formatFileSize(wavBlob.size),
+        sampleRate: audioBuffer.sampleRate,
+        channels: audioBuffer.numberOfChannels,
+        duration: audioBuffer.duration.toFixed(2) + 's',
+        language: selectedLanguage
+      });
+
+      await uploadAudioForTranscription(wavBlob, (progress) => {
+        setUploadProgress(progress);
+      }, selectedLanguage);
+
+      // After successful upload, just load history and reset UI
+      setCurrentStatus('completed');
+      setAudioPreview(null);
+      setTranscription('');
+      await loadTranscriptionHistory();
+      setShowHistory(true); // Show history modal
+
+    } catch (error: unknown) {
+      console.error('Transcription failed:', {
+        error: error,
+      });
+      
+      if (error instanceof Error) {
+        setError(error.message || 'Failed to transcribe audio. Please try again.');
+      } else {
+        setError('Failed to transcribe audio. Please try again.');
+      }
+      setCurrentStatus('error');
+    } finally {
+      setIsLoading(false);
     }
   };
 
