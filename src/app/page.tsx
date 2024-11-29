@@ -21,6 +21,10 @@ import {
   ChevronUpIcon,
   ChevronDownIcon,
   Bars3Icon,
+  DocumentTextIcon as EmptyDocumentTextIcon,
+  ExclamationCircleIcon as EmptyExclamationCircleIcon,
+  CheckCircleIcon as EmptyCheckCircleIcon,
+  QueueListIcon as EmptyQueueListIcon,
 } from '@heroicons/react/24/solid';
 import clsx from 'clsx';
 import { 
@@ -85,22 +89,26 @@ export default function Home() {
   const [hasShownHistory, setHasShownHistory] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
   const [waitingMessage, setWaitingMessage] = useState('');
+  const [showEmptyMessage, setShowEmptyMessage] = useState(false);
   const itemsPerPage = 5;
 
+  // Filter transcriptions based on active tab
   const filteredHistory = useMemo(() => {
     if (!history) return [];
-    return Object.values(history).flat().map(item => {
-      // Only mark as error if there's an actual error message
-      if (item.error) {
-        return {
-          ...item,
-          status: 'error'
-        };
-      }
-      // For empty text without error, keep the original status
-      return item;
-    });
-  }, [history]);
+    
+    if (activeTab === 'all') {
+      return Object.values(history).flat();
+    }
+
+    return history[activeTab] || [];
+  }, [history, activeTab]);
+
+  // Calculate pagination
+  const filteredTranscriptions = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    return filteredHistory.slice(start, end);
+  }, [filteredHistory, currentPage]);
 
   const hasTranscriptions = useMemo(() => {
     return filteredHistory && filteredHistory.length > 0;
@@ -133,6 +141,18 @@ export default function Home() {
     fetchHistory(currentPage);
   }, [currentPage, activeTab]);
 
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (filteredTranscriptions.length === 0 && !isLoadingHistory) {
+      timer = setTimeout(() => {
+        setShowEmptyMessage(true);
+      }, 1000);
+    } else {
+      setShowEmptyMessage(false);
+    }
+    return () => clearTimeout(timer);
+  }, [filteredTranscriptions.length, isLoadingHistory]);
+
   const handleTabChange = (tab: typeof activeTab) => {
     setActiveTab(tab);
     setCurrentPage(1); // Reset to first page when changing tabs
@@ -153,8 +173,16 @@ export default function Home() {
       // Update status counts
       setStatusCounts(response.status_counts);
       
+      // Categorize transcriptions by their status
+      const categorizedHistory = {
+        queued: response.transcriptions.queued || [],
+        processing: response.transcriptions.processing || [],
+        completed: response.transcriptions.completed || [],
+        error: response.transcriptions.error || []
+      };
+
       // Set history with the transcriptions grouped by status
-      setHistory(response.transcriptions);
+      setHistory(categorizedHistory);
       
       setIsLoadingHistory(false);
       return response;
@@ -179,8 +207,25 @@ export default function Home() {
 
   const handleTabClick = async (tab: 'all' | 'queued' | 'processing' | 'completed' | 'error') => {
     setActiveTab(tab);
-    if (showHistory) {
-      await loadTranscriptionHistory();
+    setCurrentPage(1);
+    setShowEmptyMessage(false); // Reset empty message when changing tabs
+    
+    // Reset polling status when switching to 'all' tab
+    if (tab === 'all') {
+      setCurrentStatus('completed');
+    }
+    
+    // Sync data when switching tabs
+    const response = await loadTranscriptionHistory();
+    if (response) {
+      // Only show empty message if server confirms no transcriptions for this status
+      const hasTranscriptionsForStatus = tab === 'all'
+        ? Object.values(response.transcriptions).some(arr => arr.length > 0)
+        : response.transcriptions[tab as keyof TranscriptionsByStatus]?.length > 0;
+        
+      if (!hasTranscriptionsForStatus) {
+        setTimeout(() => setShowEmptyMessage(true), 1000);
+      }
     }
   };
 
@@ -1261,11 +1306,13 @@ export default function Home() {
                           <button
                             key={tab}
                             onClick={() => handleTabClick(tab)}
+                            disabled={isLoadingHistory}
                             className={clsx(
                               "px-4 py-2 rounded-lg transition-all duration-200",
                               activeTab === tab
                                 ? "bg-purple-500 text-white"
-                                : "text-gray-500 hover:bg-purple-500/10"
+                                : "text-gray-500 hover:bg-purple-500/10",
+                              isLoadingHistory && "opacity-50 cursor-not-allowed"
                             )}
                           >
                             {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -1283,73 +1330,106 @@ export default function Home() {
                         </div>
                       ) : (
                         <div>
-                          {filteredHistory.length === 0 ? (
-                            <div className="text-center py-8">
-                              <p className="text-gray-400">No transcriptions found</p>
+                          {filteredTranscriptions.length === 0 && showEmptyMessage && (
+                            <div className="flex flex-col items-center justify-center h-64 text-center">
+                              {activeTab === 'all' ? (
+                                <>
+                                  <EmptyDocumentTextIcon className="w-16 h-16 text-gray-600 mb-4" />
+                                  <p className="text-gray-400 text-lg font-medium">No transcriptions yet</p>
+                                  <p className="text-gray-500 text-sm mt-2">Upload or record audio to get started</p>
+                                </>
+                              ) : activeTab === 'error' ? (
+                                <>
+                                  <EmptyExclamationCircleIcon className="w-16 h-16 text-gray-600 mb-4" />
+                                  <p className="text-gray-400 text-lg font-medium">No error transcriptions</p>
+                                  <p className="text-gray-500 text-sm mt-2">All your transcriptions are processing normally</p>
+                                </>
+                              ) : activeTab === 'completed' ? (
+                                <>
+                                  <EmptyCheckCircleIcon className="w-16 h-16 text-gray-600 mb-4" />
+                                  <p className="text-gray-400 text-lg font-medium">No completed transcriptions</p>
+                                  <p className="text-gray-500 text-sm mt-2">Your transcriptions are still being processed</p>
+                                </>
+                              ) : activeTab === 'processing' ? (
+                                <>
+                                  <ArrowPathIcon className="w-16 h-16 text-gray-600 mb-4 animate-spin" />
+                                  <p className="text-gray-400 text-lg font-medium">No processing transcriptions</p>
+                                  <p className="text-gray-500 text-sm mt-2">All your transcriptions are either completed or queued</p>
+                                </>
+                              ) : (
+                                <>
+                                  <EmptyQueueListIcon className="w-16 h-16 text-gray-600 mb-4" />
+                                  <p className="text-gray-400 text-lg font-medium">No queued transcriptions</p>
+                                  <p className="text-gray-500 text-sm mt-2">All your transcriptions are being processed</p>
+                                </>
+                              )}
                             </div>
-                          ) : (
-                            filteredHistory.map((item, index) => (
-                              <motion.div
-                                key={item.id}
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: index * 0.1 }}
-                                className="p-4 bg-gray-700/50 rounded-lg backdrop-blur-sm border border-gray-600/50 group relative"
-                              >
-                                <div className="flex items-center justify-between relative mb-6">
-                                  {currentStatus === 'polling' && item === filteredHistory[0] && !item.text ? (
-                                    <p className="text-gray-400 text-center w-full">Please wait, processing your audio...</p>
-                                  ) : (
-                                    <p className="text-white break-words line-clamp-3 pr-8 w-full text-center">
-                                      {item.error ? item.error : item.text}
-                                    </p>
+                          )}
+                          {filteredTranscriptions.map((item, index) => (
+                            <motion.div
+                              key={item.id}
+                              initial={{ opacity: 0, y: 20 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: index * 0.1 }}
+                              className="p-4 bg-gray-700/50 rounded-lg backdrop-blur-sm border border-gray-600/50 group relative"
+                            >
+                              <div className="flex items-center justify-between relative mb-6">
+                                {currentStatus === 'polling' && item === filteredTranscriptions[0] && !item.text && item.status === 'processing' ? (
+                                  <p className="text-gray-400 text-center w-full">Please wait, processing your audio...</p>
+                                ) : (
+                                  <p className="text-white break-words line-clamp-3 pr-8 w-full text-center">
+                                    {item.error ? item.error : item.text}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="flex items-center justify-between mt-8">
+                                <div className="flex items-center gap-2 text-sm text-gray-400 flex-wrap">
+                                  <span>{new Date(item.created_at).toLocaleString()}</span>
+                                  {item.language_code && (
+                                    <>
+                                      <span>•</span>
+                                      <span>{item.language_code.toUpperCase()}</span>
+                                    </>
                                   )}
                                 </div>
-                                <div className="flex items-center justify-between mt-8">
-                                  <div className="flex items-center gap-2 text-sm text-gray-400 flex-wrap">
-                                    <span>{new Date(item.created_at).toLocaleString()}</span>
-                                    {item.language_code && (
-                                      <>
-                                        <span>•</span>
-                                        <span>{item.language_code.toUpperCase()}</span>
-                                      </>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <div className="relative flex items-center gap-2 w-[50px] justify-end">
-                                      {item.status === 'completed' && item.text && item.text.trim() !== '' && (
-                                        <button
-                                          onClick={() => {
-                                            navigator.clipboard.writeText(item.text);
-                                            setCopiedId(item.id);
-                                            setCopySuccess(true);
-                                            setTimeout(() => {
-                                              setCopiedId(null);
-                                              setCopySuccess(false);
-                                            }, 2000);
-                                          }}
-                                          className="text-gray-400 hover:text-purple-400 transition-colors"
-                                        >
-                                          <ClipboardDocumentIcon className="w-5 h-5" />
-                                        </button>
-                                      )}
-                                      <div
-                                        className={clsx(
-                                          "absolute right-0 -top-8 bg-gray-800 text-white px-2 py-1 rounded text-sm transition-all",
-                                          copiedId === item.id ? "opacity-100" : "opacity-0"
-                                        )}
+                                <div className="flex items-center gap-2">
+                                  <div className="relative flex items-center gap-2 w-[50px] justify-end">
+                                    {item.status === 'completed' && item.text && item.text.trim() !== '' && (
+                                      <button
+                                        onClick={() => {
+                                          navigator.clipboard.writeText(item.text);
+                                          setCopiedId(item.id);
+                                          setCopySuccess(true);
+                                          setTimeout(() => {
+                                            setCopiedId(null);
+                                            setCopySuccess(false);
+                                          }, 2000);
+                                        }}
+                                        className="text-gray-400 hover:text-purple-400 transition-colors"
                                       >
-                                        Copied!
-                                      </div>
+                                        <ClipboardDocumentIcon className="w-5 h-5" />
+                                      </button>
+                                    )}
+                                    <div
+                                      className={clsx(
+                                        "absolute right-0 -top-8 bg-gray-800 text-white px-2 py-1 rounded text-sm transition-all",
+                                        copiedId === item.id ? "opacity-100" : "opacity-0"
+                                      )}
+                                    >
+                                      Copied!
                                     </div>
-                                    <TranscriptionStatus 
-                                      status={(!item.text || item.text.trim() === '') ? 'error' : item.status}
-                                    />
                                   </div>
+                                  <TranscriptionStatus 
+                                    status={
+                                      currentStatus === 'polling' && item === filteredTranscriptions[0] && !item.text && item.status === 'processing'
+                                        ? 'processing'
+                                        : item.error ? 'error' : item.status
+                                    }
+                                  />
                                 </div>
-                              </motion.div>
-                            ))
-                          )}
+                              </div>
+                            </motion.div>
+                          ))}
                           {filteredHistory.length > itemsPerPage && (
                             <Pagination
                               currentPage={currentPage}
@@ -1448,7 +1528,7 @@ export default function Home() {
                                 </div>
                               </div>
                               <TranscriptionStatus 
-                                status={(!item.text || item.text.trim() === '') ? 'error' : item.status}
+                                status={item.error ? 'error' : item.status}
                               />
                             </div>
                           </div>
