@@ -20,6 +20,7 @@ import {
   ExclamationTriangleIcon,
   ChevronUpIcon,
   ChevronDownIcon,
+  Bars3Icon,
 } from '@heroicons/react/24/solid';
 import clsx from 'clsx';
 import { 
@@ -59,7 +60,7 @@ export default function Home() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [stats, setStats] = useState<TranscriptionStats>({ characters: 0, words: 0, sentences: 0 });
-  const [currentStatus, setCurrentStatus] = useState<'queued' | 'processing' | 'completed' | 'error'>('queued');
+  const [currentStatus, setCurrentStatus] = useState<'queued' | 'processing' | 'completed' | 'error' | 'polling'>('queued');
   const [showHistory, setShowHistory] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'queued' | 'processing' | 'completed' | 'error'>('all');
@@ -73,14 +74,17 @@ export default function Home() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [recordingDuration, setRecordingDuration] = useState(0);
-  const [selectedLanguage, setSelectedLanguage] = useState('en');
+  const [selectedLanguage, setSelectedLanguage] = useState('');
   const [keepLanguage, setKeepLanguage] = useState(false);
   const [languageError, setLanguageError] = useState<string>('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [showPreviousTranscriptions, setShowPreviousTranscriptions] = useState(true);
+  const [showPreviousTranscriptions, setShowPreviousTranscriptions] = useState(false);
   const [showViewAllButton, setShowViewAllButton] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [hasShownHistory, setHasShownHistory] = useState(false);
+  const [isPolling, setIsPolling] = useState(false);
+  const [waitingMessage, setWaitingMessage] = useState('');
   const itemsPerPage = 5;
 
   const filteredHistory = useMemo(() => {
@@ -132,13 +136,17 @@ export default function Home() {
   const handleTabChange = (tab: typeof activeTab) => {
     setActiveTab(tab);
     setCurrentPage(1); // Reset to first page when changing tabs
+    // Reset polling status when switching to 'all' tab
+    if (tab === 'all') {
+      setCurrentStatus('completed');
+    }
   };
 
   const loadTranscriptionHistory = async () => {
-    if (isLoadingHistory) return;
+    if (isLoadingHistory) return null;
     
+    setIsLoadingHistory(true);
     try {
-      setIsLoadingHistory(true);
       const response: TranscriptionHistoryResponse = await getTranscriptionHistory();
       console.log('Received history:', response);
       
@@ -148,6 +156,8 @@ export default function Home() {
       // Set history with the transcriptions grouped by status
       setHistory(response.transcriptions);
       
+      setIsLoadingHistory(false);
+      return response;
     } catch (error) {
       console.error('Error loading history:', error);
       setHistory({
@@ -162,8 +172,8 @@ export default function Home() {
         completed: 0,
         error: 0
       });
-    } finally {
       setIsLoadingHistory(false);
+      return null;
     }
   };
 
@@ -266,15 +276,8 @@ export default function Home() {
         selectedLanguage
       );
 
-      setCurrentStatus('completed');
-      setAudioPreview(null);
-      setSelectedFile(null);
-      setTranscription('');
-      await loadTranscriptionHistory();
-      setShowHistory(true);
-      if (!keepLanguage) {
-        setSelectedLanguage('');
-      }
+      await handleUploadSuccess();
+
     } catch (error: any) {
       console.error('Transcription error:', error);
       setError(error.message || 'Failed to start transcription');
@@ -535,12 +538,7 @@ export default function Home() {
         setUploadProgress(progress);
       }, selectedLanguage);
 
-      // After successful upload, just load history and reset UI
-      setCurrentStatus('completed');
-      setAudioPreview(null);
-      setTranscription('');
-      await loadTranscriptionHistory();
-      setShowHistory(true); // Show history modal
+      await handleUploadSuccess();
 
     } catch (error: any) {
       console.error('Transcription failed:', {
@@ -577,10 +575,18 @@ export default function Home() {
     }
   };
 
-  const handleHistoryClick = async () => {
-    setShowHistory(true);
-    setActiveTab('all');
-    await loadTranscriptionHistory();
+  const handleHistoryClick = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (showHistory) {
+      setShowHistory(false);
+      setShowPreviousTranscriptions(true);
+    } else {
+      setShowHistory(true);
+      setShowPreviousTranscriptions(false);
+      setActiveTab('all');
+      await loadTranscriptionHistory();
+      setHasShownHistory(true);
+    }
   };
 
   const handleTimeUpdate = () => {
@@ -716,30 +722,51 @@ export default function Home() {
     );
   };
 
-  const handleUploadComplete = () => {
-    setIsLoading(false);
-    setUploadProgress(0);
-    setSelectedFile(null);
-    if (!keepLanguage) {
-      setSelectedLanguage('');
-    }
-  };
+  const pollTranscriptionStatus = async () => {
+    if (currentStatus !== 'polling') return;
 
-  const handleRecordingComplete = (audioBlob: Blob) => {
-    setIsRecording(false);
-    setSelectedFile(new File([audioBlob], 'recording.wav', { type: 'audio/wav' }));
-    if (!keepLanguage) {
-      setSelectedLanguage('');
-    }
-  };
+    try {
+      const response = await loadTranscriptionHistory();
+      if (!response) return;
+      
+      const latestTranscriptions = Object.values(response || {}).flat();
+      const latestTranscription = latestTranscriptions[0];
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      if (!keepLanguage) {
-        setSelectedLanguage('');
+      if ((latestTranscription?.text && latestTranscription.text.trim() !== '') || latestTranscription?.error) {
+        setCurrentStatus('completed');
+        return;
       }
+
+      // Only continue polling if we're not on the 'all' tab or haven't received a response
+      if (currentStatus === 'polling' && (!latestTranscription?.text || activeTab !== 'all')) {
+        setTimeout(pollTranscriptionStatus, 2000);
+      }
+    } catch (error) {
+      console.error('Error polling transcription status:', error);
+      setCurrentStatus('error');
+    }
+  };
+
+  const handleManualReload = async () => {
+    if (currentStatus === 'polling') {
+      await loadTranscriptionHistory();
+    }
+  };
+
+  const handleUploadSuccess = async () => {
+    setCurrentStatus('polling');
+    setAudioPreview(null);
+    setTranscription('');
+    setShowHistory(true);
+    setActiveTab('all');
+    setShowPreviousTranscriptions(false);
+    
+    // Initial load and start polling
+    await loadTranscriptionHistory();
+    pollTranscriptionStatus();
+
+    if (!keepLanguage) {
+      setSelectedLanguage('');
     }
   };
 
@@ -835,12 +862,7 @@ export default function Home() {
         setUploadProgress(progress);
       }, selectedLanguage);
 
-      // After successful upload, just load history and reset UI
-      setCurrentStatus('completed');
-      setAudioPreview(null);
-      setTranscription('');
-      await loadTranscriptionHistory();
-      setShowHistory(true); // Show history modal
+      await handleUploadSuccess();
 
     } catch (error: unknown) {
       console.error('Transcription failed:', {
@@ -870,7 +892,7 @@ export default function Home() {
     <main className="min-h-screen p-4 md:p-8 futuristic-scrollbar">
       <div style={{ position: 'fixed', top: '16px', right: '16px', zIndex: 9999, display: showHistory ? 'none' : 'block' }}>
         <button
-          onClick={handleHistoryClick}
+          onClick={(e) => handleHistoryClick(e)}
           className="flex items-center space-x-2 p-2 bg-gray-800 text-white rounded-lg transition-colors hover:bg-gray-700"
         >
           <div className="flex flex-col gap-1">
@@ -954,7 +976,7 @@ export default function Home() {
               {audioPreview && (
                 <div className="mt-4 p-6 bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700/50">
                   <div className="flex flex-col space-y-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
                       <div className="flex items-center space-x-4">
                         <motion.button
                           onClick={toggleAudioPlayback}
@@ -979,12 +1001,12 @@ export default function Home() {
                             : `${formatTime(currentTime)} / ${formatTime(duration)}`}
                         </div>
                       </div>
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center justify-center sm:justify-end space-x-2 w-full sm:w-auto">
                         <motion.button
                           onClick={handleStartTranscription}
                           disabled={isLoading}
                           className={clsx(
-                            "px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200",
+                            "px-4 py-2 rounded-lg text-base font-medium transition-all duration-200 w-full sm:w-auto",
                             isLoading
                               ? "bg-purple-500/50 text-white cursor-not-allowed"
                               : "bg-purple-500 text-white hover:bg-purple-600"
@@ -993,13 +1015,13 @@ export default function Home() {
                           whileTap={!isLoading ? { scale: 0.95 } : {}}
                         >
                           {isLoading ? (
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center justify-center gap-2">
                               <ArrowPathIcon className="w-4 h-4 animate-spin" />
-                              <span>Transcribing...</span>
+                              <span>Processing...</span>
                             </div>
                           ) : (
-                            <div className="flex items-center gap-2">
-                              <DocumentTextIcon className="w-4 h-4" />
+                            <div className="flex items-center justify-center gap-2">
+                              <DocumentTextIcon className="w-5 h-5" />
                               <span>Transcribe</span>
                             </div>
                           )}
@@ -1235,61 +1257,20 @@ export default function Home() {
                     </div>
                     <div className="px-6 pt-4 border-b border-gray-700">
                       <div className="flex gap-2 overflow-x-auto pb-4 hide-scrollbar">
-                        <button
-                          onClick={() => handleTabChange('all')}
-                          className={clsx(
-                            "px-4 py-2 rounded-lg transition-all duration-200",
-                            activeTab === 'all'
-                              ? "bg-purple-500 text-white"
-                              : "text-gray-500 hover:bg-purple-500/10"
-                          )}
-                        >
-                          All
-                        </button>
-                        <button
-                          onClick={() => handleTabChange('completed')}
-                          className={clsx(
-                            "px-4 py-2 rounded-lg transition-all duration-200",
-                            activeTab === 'completed'
-                              ? "bg-purple-500 text-white"
-                              : "text-gray-500 hover:bg-purple-500/10"
-                          )}
-                        >
-                          Completed
-                        </button>
-                        <button
-                          onClick={() => handleTabChange('processing')}
-                          className={clsx(
-                            "px-4 py-2 rounded-lg transition-all duration-200",
-                            activeTab === 'processing'
-                              ? "bg-purple-500 text-white"
-                              : "text-gray-500 hover:bg-purple-500/10"
-                          )}
-                        >
-                          Processing
-                        </button>
-                        <button
-                          onClick={() => handleTabChange('queued')}
-                          className={clsx(
-                            "px-4 py-2 rounded-lg transition-all duration-200",
-                            activeTab === 'queued'
-                              ? "bg-purple-500 text-white"
-                              : "text-gray-500 hover:bg-purple-500/10"
-                          )}
-                        >
-                          Queued
-                        </button>
-                        <button
-                          onClick={() => handleTabChange('error')}
-                          className={clsx(
-                            "px-4 py-2 rounded-lg transition-all duration-200",
-                            activeTab === 'error'
-                              ? "bg-purple-500 text-white"
-                              : "text-gray-500 hover:bg-purple-500/10"
-                          )}
-                        >
-                          Error
-                        </button>
+                        {(['all', 'completed', 'processing', 'queued', 'error'] as const).map((tab) => (
+                          <button
+                            key={tab}
+                            onClick={() => handleTabClick(tab)}
+                            className={clsx(
+                              "px-4 py-2 rounded-lg transition-all duration-200",
+                              activeTab === tab
+                                ? "bg-purple-500 text-white"
+                                : "text-gray-500 hover:bg-purple-500/10"
+                            )}
+                          >
+                            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                          </button>
+                        ))}
                       </div>
                     </div>
                     <div 
@@ -1298,86 +1279,77 @@ export default function Home() {
                     >
                       {isLoadingHistory ? (
                         <div className="flex items-center justify-center h-32">
-                          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500"></div>
-                        </div>
-                      ) : !filteredHistory || filteredHistory.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-64 text-center">
-                          {!hasTranscriptions ? (
-                            <>
-                              <DocumentTextIcon className="w-16 h-16 text-gray-600 mb-4" />
-                              <p className="text-gray-400">No transcriptions yet</p>
-                              <p className="text-gray-500 text-sm mt-2">Record or upload audio to get started</p>
-                            </>
-                          ) : (
-                            <>
-                              <FolderIcon className="w-16 h-16 text-gray-600 mb-4" />
-                              <p className="text-gray-400">
-                                {activeTab === 'all' 
-                                  ? 'No transcriptions found'
-                                  : `No ${activeTab} transcriptions`}
-                              </p>
-                            </>
-                          )}
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
                         </div>
                       ) : (
-                        <div className="space-y-4 mt-4">
-                          {filteredHistory.map((item, index) => (
-                            <motion.div
-                              key={item.id}
-                              initial={{ opacity: 0, y: 20 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{ delay: index * 0.1 }}
-                              className="p-4 bg-gray-700/50 rounded-lg backdrop-blur-sm border border-gray-600/50 group relative"
-                            >
-                              <div className="flex items-center justify-between relative mb-6">
-                                <p className="text-white break-words line-clamp-3 pr-8 w-full text-center">
-                                  {item.error ? item.error : item.text}
-                                </p>
-                              </div>
-                              <div className="flex items-center justify-between mt-8">
-                                <div className="flex items-center gap-2 text-sm text-gray-400 flex-wrap">
-                                  <span>{new Date(item.created_at).toLocaleString()}</span>
-                                  {item.language_code && (
-                                    <>
-                                      <span>•</span>
-                                      <span>{item.language_code.toUpperCase()}</span>
-                                    </>
+                        <div>
+                          {filteredHistory.length === 0 ? (
+                            <div className="text-center py-8">
+                              <p className="text-gray-400">No transcriptions found</p>
+                            </div>
+                          ) : (
+                            filteredHistory.map((item, index) => (
+                              <motion.div
+                                key={item.id}
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: index * 0.1 }}
+                                className="p-4 bg-gray-700/50 rounded-lg backdrop-blur-sm border border-gray-600/50 group relative"
+                              >
+                                <div className="flex items-center justify-between relative mb-6">
+                                  {currentStatus === 'polling' && item === filteredHistory[0] && !item.text ? (
+                                    <p className="text-gray-400 text-center w-full">Please wait, processing your audio...</p>
+                                  ) : (
+                                    <p className="text-white break-words line-clamp-3 pr-8 w-full text-center">
+                                      {item.error ? item.error : item.text}
+                                    </p>
                                   )}
                                 </div>
-                                <div className="flex items-center gap-2">
-                                  <div className="relative flex items-center gap-2 w-[50px] justify-end">
-                                    {item.status === 'completed' && item.text && item.text.trim() !== '' && (
-                                      <button
-                                        onClick={() => {
-                                          navigator.clipboard.writeText(item.text);
-                                          setCopiedId(item.id);
-                                          setCopySuccess(true);
-                                          setTimeout(() => {
-                                            setCopiedId(null);
-                                            setCopySuccess(false);
-                                          }, 2000);
-                                        }}
-                                        className="text-gray-400 hover:text-purple-400 transition-colors"
-                                      >
-                                        <ClipboardDocumentIcon className="w-5 h-5" />
-                                      </button>
+                                <div className="flex items-center justify-between mt-8">
+                                  <div className="flex items-center gap-2 text-sm text-gray-400 flex-wrap">
+                                    <span>{new Date(item.created_at).toLocaleString()}</span>
+                                    {item.language_code && (
+                                      <>
+                                        <span>•</span>
+                                        <span>{item.language_code.toUpperCase()}</span>
+                                      </>
                                     )}
-                                    <div
-                                      className={clsx(
-                                        "absolute right-0 -top-8 bg-gray-800 text-white px-2 py-1 rounded text-sm transition-all",
-                                        copiedId === item.id ? "opacity-100" : "opacity-0"
-                                      )}
-                                    >
-                                      Copied!
-                                    </div>
                                   </div>
-                                  <TranscriptionStatus 
-                                    status={(!item.text || item.text.trim() === '') ? 'error' : item.status}
-                                  />
+                                  <div className="flex items-center gap-2">
+                                    <div className="relative flex items-center gap-2 w-[50px] justify-end">
+                                      {item.status === 'completed' && item.text && item.text.trim() !== '' && (
+                                        <button
+                                          onClick={() => {
+                                            navigator.clipboard.writeText(item.text);
+                                            setCopiedId(item.id);
+                                            setCopySuccess(true);
+                                            setTimeout(() => {
+                                              setCopiedId(null);
+                                              setCopySuccess(false);
+                                            }, 2000);
+                                          }}
+                                          className="text-gray-400 hover:text-purple-400 transition-colors"
+                                        >
+                                          <ClipboardDocumentIcon className="w-5 h-5" />
+                                        </button>
+                                      )}
+                                      <div
+                                        className={clsx(
+                                          "absolute right-0 -top-8 bg-gray-800 text-white px-2 py-1 rounded text-sm transition-all",
+                                          copiedId === item.id ? "opacity-100" : "opacity-0"
+                                        )}
+                                      >
+                                        Copied!
+                                      </div>
+                                    </div>
+                                    <TranscriptionStatus 
+                                      status={(!item.text || item.text.trim() === '') ? 'error' : item.status}
+                                    />
+                                  </div>
                                 </div>
-                              </div>
-                            </motion.div>
-                          ))}
+                              </motion.div>
+                            ))
+                          )}
                           {filteredHistory.length > itemsPerPage && (
                             <Pagination
                               currentPage={currentPage}
@@ -1393,7 +1365,7 @@ export default function Home() {
               )}
             </AnimatePresence>
 
-            {Object.values(statusCountsMemo).some(count => count > 0) && (
+            {Object.values(statusCountsMemo).some(count => count > 0) && !showHistory && hasShownHistory && (
               <div className={clsx(
                 "relative w-full",
                 Object.values(statusCountsMemo).some(count => count > 0) ? "mt-4" : "mt-0"
@@ -1402,8 +1374,12 @@ export default function Home() {
                   <div className="flex justify-between items-center mb-4 cursor-pointer"
                      onClick={() => setShowPreviousTranscriptions(!showPreviousTranscriptions)}>
                     <div className="flex-1" />
-                    <h2 className="text-2xl font-semibold text-gray-200 flex-1 text-center group-hover:text-white transition-colors">
-                      Previous Transcriptions
+                    <h2 className="text-2xl font-semibold text-gray-200 flex-1 text-center group-hover:text-white transition-colors whitespace-nowrap sm:whitespace-normal">
+                      <span className="hidden sm:inline">Previous Transcriptions</span>
+                      <span className="sm:hidden">
+                        Previous<br />
+                        Transcriptions
+                      </span>
                     </h2>
                     <div className="flex-1 flex justify-end">
                       <button
