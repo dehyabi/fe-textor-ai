@@ -173,6 +173,10 @@ export default function Home() {
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (filteredTranscriptions.length === 0 && !isLoadingHistory) {
+      // Only show empty message for error tab if we have history data
+      if (activeTab === 'error' && !history) {
+        return;
+      }
       timer = setTimeout(() => {
         setShowEmptyMessage(true);
       }, 1000);
@@ -180,7 +184,7 @@ export default function Home() {
       setShowEmptyMessage(false);
     }
     return () => clearTimeout(timer);
-  }, [filteredTranscriptions.length, isLoadingHistory]);
+  }, [filteredTranscriptions.length, isLoadingHistory, activeTab, history]);
 
   const handleTabChange = (tab: typeof activeTab) => {
     setActiveTab(tab);
