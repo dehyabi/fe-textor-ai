@@ -170,14 +170,12 @@ export const uploadAudioForTranscription = async (
 
 export const getTranscriptionHistory = async (
   page: number = 1,
-  limit: number = 5,
   status: string = 'all'
 ): Promise<TranscriptionHistoryResponse> => {
   try {
     const response = await api.get('/api/transcribe/', {
       params: {
         page,
-        limit,
         status: status === 'all' ? undefined : status
       }
     });
@@ -186,7 +184,7 @@ export const getTranscriptionHistory = async (
     return {
       transcriptions: response.data.transcriptions,
       status_counts: response.data.status_counts,
-      total_pages: response.data.total_pages || Math.ceil(response.data.total_count / limit) || 1,
+      total_pages: response.data.total_pages || 1,
       current_page: response.data.current_page || page,
       total_count: response.data.total_count || 0
     };

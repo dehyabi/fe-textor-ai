@@ -790,7 +790,7 @@ export default function Home() {
   const fetchHistory = async (page: number) => {
     try {
       setIsLoadingHistory(true);
-      const response = await getTranscriptionHistory(page, itemsPerPage, activeTab);
+      const response = await getTranscriptionHistory(page, activeTab);
       
       // Update history with the current page's data
       setHistory({
