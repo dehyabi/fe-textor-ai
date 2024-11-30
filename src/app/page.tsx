@@ -91,6 +91,7 @@ export default function Home() {
   const [isPolling, setIsPolling] = useState(false);
   const [waitingMessage, setWaitingMessage] = useState('');
   const [showEmptyMessage, setShowEmptyMessage] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const itemsPerPage = 5;
 
   // Filter transcriptions based on active tab
@@ -165,6 +166,17 @@ export default function Home() {
 
     return counts;
   }, [history]);
+
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      try {
+        await fetchHistory(1);
+      } finally {
+        setIsInitialLoading(false);
+      }
+    };
+    fetchInitialData();
+  }, []);
 
   useEffect(() => {
     fetchHistory(currentPage);
@@ -913,6 +925,26 @@ export default function Home() {
   const dropZoneRef = useRef<HTMLDivElement>(null);
   const recordingStartTimeRef = useRef<number | null>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  if (isInitialLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 via-purple-900/20 to-gray-900">
+        <div className="relative">
+          <div className="absolute inset-0 blur-xl bg-purple-500/20 animate-pulse rounded-full"></div>
+          <div className="animate-futuristic-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+        </div>
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="mt-4 text-purple-400 text-sm font-light tracking-wider uppercase"
+        >
+          Loading your workspace
+        </motion.div>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(147,51,234,0.1),transparent_50%)]"></div>
+      </div>
+    );
+  }
 
   return (
     <main className="min-h-screen p-4 md:p-8 futuristic-scrollbar">

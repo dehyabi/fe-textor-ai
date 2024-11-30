@@ -46,26 +46,14 @@
 @keyframes futuristic-spin {
   0% {
     transform: rotate(0deg);
-    opacity: 0.8;
-    filter: drop-shadow(0 0 2px theme('colors.purple.400'));
-  }
-  25% {
-    opacity: 0.9;
-    filter: drop-shadow(0 0 4px theme('colors.purple.400'));
+    filter: drop-shadow(0 0 2px rgba(168, 85, 247, 0.4));
   }
   50% {
-    transform: rotate(180deg);
-    opacity: 1;
-    filter: drop-shadow(0 0 6px theme('colors.purple.500'));
-  }
-  75% {
-    opacity: 0.9;
-    filter: drop-shadow(0 0 4px theme('colors.purple.400'));
+    filter: drop-shadow(0 0 8px rgba(168, 85, 247, 0.6));
   }
   100% {
     transform: rotate(360deg);
-    opacity: 0.8;
-    filter: drop-shadow(0 0 2px theme('colors.purple.400'));
+    filter: drop-shadow(0 0 2px rgba(168, 85, 247, 0.4));
   }
 }
 
@@ -75,8 +63,23 @@
 }
 
 .animate-futuristic-spin:hover {
-  animation-duration: 1.5s;
-  filter: drop-shadow(0 0 8px theme('colors.purple.500'));
+  filter: drop-shadow(0 0 12px rgba(168, 85, 247, 0.8));
+  transform: scale(1.05);
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.05);
+  }
+}
+
+.animate-pulse {
+  animation: pulse-glow 2s ease-in-out infinite;
 }
 
 :root {
