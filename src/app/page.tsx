@@ -1411,8 +1411,8 @@ export default function Home() {
                                         </div>
                                       )}
                                       <TranscriptionStatus 
-                                        status={item.error === "Please wait, processing your audio..." ? 'processing' : 
-                                               !item.text ? 'error' : item.status}
+                                        status={item.error === "Your transcription is being processed..." ? 'processing' : 
+                                               item.error ? 'error' : item.status}
                                       />
                                     </div>
                                   </div>
