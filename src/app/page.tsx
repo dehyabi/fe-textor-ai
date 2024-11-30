@@ -98,15 +98,19 @@ export default function Home() {
     if (!history) return [];
     
     return Object.values(history).flat().filter((item) => {
-      const hasError = item.error || (!item.text || item.text.trim() === '');
+      let itemStatus = item.status;
       
+      // Check if item has the processing message
+      if (item.error === "Please wait, processing your audio...") {
+        itemStatus = 'processing';
+      }
+      // Handle error cases
+      else if (item.error || (!item.text && item.status === 'completed')) {
+        itemStatus = 'error';
+      }
+
       if (activeTab === 'all') return true;
-      if (activeTab === 'error' && hasError) return true;
-      if (activeTab === 'completed' && item.status === 'completed' && !hasError) return true;
-      if (activeTab === 'processing' && item.status === 'processing') return true;
-      if (activeTab === 'queued' && item.status === 'queued') return true;
-      
-      return false;
+      return itemStatus === activeTab;
     });
   }, [history, activeTab]);
 
@@ -138,14 +142,29 @@ export default function Home() {
   }, [history]);
 
   const statusCountsMemo = useMemo(() => {
-    if (!statusCounts) return {
-      queued: 0,
-      processing: 0,
+    const counts = {
       completed: 0,
+      processing: 0,
+      queued: 0,
       error: 0
     };
-    return statusCounts;
-  }, [statusCounts]);
+
+    Object.values(history || {}).flat().forEach((item) => {
+      if (item.error === "Please wait, processing your audio...") {
+        counts.processing++;
+      } else if (item.error || (!item.text && item.status === 'completed')) {
+        counts.error++;
+      } else if (item.status === 'completed' && item.text) {
+        counts.completed++;
+      } else if (item.status === 'processing') {
+        counts.processing++;
+      } else {
+        counts.queued++;
+      }
+    });
+
+    return counts;
+  }, [history]);
 
   useEffect(() => {
     fetchHistory(currentPage);
@@ -1377,41 +1396,27 @@ export default function Home() {
                               )}
                             </div>
                           )}
-                          {filteredTranscriptions.map((item, index) => (
+                          {filteredTranscriptions.map((item) => (
                             <motion.div
                               key={item.id}
-                              initial={{ opacity: 0, y: 20 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{ delay: index * 0.1 }}
-                              className="p-4 bg-gray-700/50 rounded-lg backdrop-blur-sm border border-gray-600/50 group relative mb-4"
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              className="p-4 bg-gray-800 rounded-lg flex flex-col gap-4 group relative hover:bg-gray-700/50 transition-colors"
                             >
-                              <div className="flex items-center justify-between relative mb-6">
-                                {currentStatus === 'polling' && item === filteredTranscriptions[0] && !item.text && item.status === 'processing' ? (
-                                  <p className="text-gray-400 text-center w-full">Please wait, processing your audio...</p>
-                                ) : (
-                                  <p className="text-white break-words line-clamp-3 pr-8 w-full text-center">
-                                    {item.error ? (
-                                      <span className="text-red-500">{item.error}</span>
-                                    ) : item.text ? (
-                                      item.text
-                                    ) : (
-                                      <span className="text-red-500">Transcription not available</span>
-                                    )}
-                                  </p>
-                                )}
-                              </div>
-                              <div className="flex items-center justify-between mt-8">
-                                <div className="flex items-center gap-2 text-sm text-gray-400 flex-wrap">
-                                  <span>{new Date(item.created_at).toLocaleString()}</span>
-                                  {item.language_code && (
-                                    <>
-                                      <span>•</span>
-                                      <span>{item.language_code.toUpperCase()}</span>
-                                    </>
+                              <div className="flex items-center justify-between relative">
+                                <p className="text-gray-200 flex-1 pr-8 line-clamp-3">
+                                  {item.error ? (
+                                    <span className="text-red-500">{item.error}</span>
+                                  ) : item.text ? (
+                                    item.text
+                                  ) : activeTab === 'processing' || item.status === 'processing' ? (
+                                    <span className="text-yellow-500">Your transcription is being processed...</span>
+                                  ) : (
+                                    <span className="text-red-500">Transcription not available</span>
                                   )}
-                                </div>
+                                </p>
                                 <div className="flex items-center gap-2">
-                                  <div className="relative flex items-center gap-2 w-[50px] justify-end">
+                                  <div className="relative flex items-center gap-2">
                                     {item.status === 'completed' && item.text && item.text.trim() !== '' && (
                                       <button
                                         onClick={() => {
@@ -1425,21 +1430,37 @@ export default function Home() {
                                         }}
                                         className="text-gray-400 hover:text-purple-400 transition-colors"
                                       >
-                                        <ClipboardDocumentIcon className="w-5 h-5" />
+                                        <ClipboardDocumentIcon className="h-5 w-5" />
                                       </button>
                                     )}
-                                    <div
-                                      className={clsx(
-                                        "absolute right-0 -top-8 bg-gray-800 text-white px-2 py-1 rounded text-sm transition-all",
-                                        copiedId === item.id ? "opacity-100" : "opacity-0"
+                                    <AnimatePresence>
+                                      {copySuccess && copiedId === item.id && (
+                                        <motion.div
+                                          initial={{ opacity: 0, y: 10 }}
+                                          animate={{ opacity: 1, y: 0 }}
+                                          exit={{ opacity: 0, y: 10 }}
+                                          className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-green-500 text-white text-xs rounded whitespace-nowrap"
+                                        >
+                                          Copied!
+                                        </motion.div>
                                       )}
-                                    >
-                                      Copied!
-                                    </div>
+                                    </AnimatePresence>
                                   </div>
                                   <TranscriptionStatus 
-                                    status={item.error ? 'error' : (!item.text || item.text.trim() === '') ? 'error' : item.status}
+                                    status={item.error === "Please wait, processing your audio..." ? 'processing' : item.status}
+                                    showBadge={false}
                                   />
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between text-sm text-gray-400">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span>{new Date(item.created_at).toLocaleString()}</span>
+                                  {item.language_code && (
+                                    <>
+                                      <span>•</span>
+                                      <span>{item.language_code.toUpperCase()}</span>
+                                    </>
+                                  )}
                                 </div>
                               </div>
                             </motion.div>
@@ -1504,7 +1525,14 @@ export default function Home() {
                           <div className="flex items-center justify-between relative">
                             <p className="text-gray-200 flex-1 pr-8 line-clamp-3">
                               {item.error ? (
-                                <span className="text-red-500">{item.error}</span>
+                                item.error === "Please wait, processing your audio..." ? (
+                                  <span className="text-yellow-500 flex items-center gap-2">
+                                    <ArrowPathIcon className="h-4 w-4 animate-spin" />
+                                    {item.error}
+                                  </span>
+                                ) : (
+                                  <span className="text-red-500">{item.error}</span>
+                                )
                               ) : item.text ? (
                                 item.text
                               ) : (

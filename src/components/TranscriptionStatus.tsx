@@ -58,10 +58,15 @@ const statusConfig: Record<string, StatusConfig> = {
 };
 
 export default function TranscriptionStatus({ status, error, className, showBadge = false }: TranscriptionStatusProps) {
-  const Icon = statusConfig[status].icon;
-  const config = statusConfig[status];
+  let currentStatus = status;
+  if (error === "Please wait, processing your audio...") {
+    currentStatus = 'processing';
+  }
   
-  const spinAnimation = status === 'processing' || status === 'polling' 
+  const Icon = statusConfig[currentStatus].icon;
+  const config = statusConfig[currentStatus];
+  
+  const spinAnimation = currentStatus === 'processing' || currentStatus === 'polling' 
     ? 'animate-futuristic-spin transition-all duration-300 ease-in-out hover:text-purple-400 hover:shadow-lg hover:shadow-purple-500/20' 
     : '';
   
@@ -70,7 +75,7 @@ export default function TranscriptionStatus({ status, error, className, showBadg
       <div className={`flex items-center space-x-2 rounded-lg px-3 py-1.5 backdrop-blur-sm ${config.bgColor} ${className || ''}`}>
         <Icon className={`h-5 w-5 ${config.color} ${spinAnimation}`} />
         <span className={`font-medium ${config.textColor}`}>{config.label}</span>
-        {error && status === 'error' && (
+        {error && currentStatus === 'error' && (
           <span className="text-sm text-red-600 ml-2">({error})</span>
         )}
       </div>
@@ -80,7 +85,7 @@ export default function TranscriptionStatus({ status, error, className, showBadg
   return (
     <div className={`flex items-center ${className || ''}`}>
       <Icon className={`h-5 w-5 ${config.color} ${spinAnimation}`} />
-      {error && status === 'error' && (
+      {error && currentStatus === 'error' && (
         <span className="text-sm text-red-600 ml-2">({error})</span>
       )}
     </div>
