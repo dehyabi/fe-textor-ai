@@ -94,15 +94,26 @@ export default function Home() {
   const itemsPerPage = 5;
 
   // Filter transcriptions based on active tab
-  const filteredHistory = useMemo(() => {
+  const filteredTranscriptions = useMemo(() => {
     if (!history) return [];
-    return Object.values(history).flat();
-  }, [history]);
+    
+    return Object.values(history).flat().filter((item) => {
+      const hasError = item.error || (!item.text || item.text.trim() === '');
+      
+      if (activeTab === 'all') return true;
+      if (activeTab === 'error' && hasError) return true;
+      if (activeTab === 'completed' && item.status === 'completed' && !hasError) return true;
+      if (activeTab === 'processing' && item.status === 'processing') return true;
+      if (activeTab === 'queued' && item.status === 'queued') return true;
+      
+      return false;
+    });
+  }, [history, activeTab]);
 
   // Calculate pagination
-  const filteredTranscriptions = useMemo(() => {
-    return filteredHistory;
-  }, [filteredHistory]);
+  const filteredHistory = useMemo(() => {
+    return filteredTranscriptions;
+  }, [filteredTranscriptions]);
 
   const hasTranscriptions = useMemo(() => {
     return filteredHistory && filteredHistory.length > 0;
