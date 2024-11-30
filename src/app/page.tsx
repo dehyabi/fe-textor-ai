@@ -121,15 +121,20 @@ export default function Home() {
 
   const latestCompletedTranscriptions = useMemo(() => {
     if (!history) return [];
-    const completed = Object.values(history)
+    
+    const allCompleted = Object.values(history)
       .flat()
-      .filter(item => item.status === 'completed')
-      .slice(0, 3);
+      .filter(item => 
+        item.status === 'completed' && 
+        item.text && 
+        item.text.trim() !== '' && 
+        !item.error
+      )
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     
-    // Show view all button if there are more than 3 completed transcriptions
-    setShowViewAllButton(Object.values(history).flat().filter(item => item.status === 'completed').length > 3);
+    setShowViewAllButton(allCompleted.length > 5);
     
-    return completed;
+    return allCompleted.slice(0, 5);
   }, [history]);
 
   const statusCountsMemo = useMemo(() => {
@@ -1463,7 +1468,7 @@ export default function Home() {
                   <div className="flex justify-between items-center mb-4 cursor-pointer"
                      onClick={() => setShowPreviousTranscriptions(!showPreviousTranscriptions)}>
                     <div className="flex-1" />
-                    <h2 className="text-2xl font-semibold text-gray-200 flex-1 text-center group-hover:text-white transition-colors whitespace-nowrap sm:whitespace-normal">
+                    <h2 className="text-2xl font-semibold text-gray-200 flex-1 text-center group-hover:text-white transition-colors">
                       <span className="hidden sm:inline">Previous Transcriptions</span>
                       <span className="sm:hidden">
                         Previous<br />
