@@ -537,70 +537,18 @@ export default function Home() {
       setError(null);
       setCurrentStatus('queued');
       setUploadProgress(0);
-
-      // Get the audio blob from the preview URL
-      const response = await fetch(audioPreview);
-      const audioBlob = await response.blob();
-
-      // Convert WebM to WAV
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const arrayBuffer = await audioBlob.arrayBuffer();
-      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
       
-      // Create WAV file
-      const wavBlob = await new Promise<Blob>((resolve) => {
-        const numberOfChannels = audioBuffer.numberOfChannels;
-        const length = audioBuffer.length;
-        const sampleRate = audioBuffer.sampleRate;
-        const wavBuffer = new ArrayBuffer(44 + length * 2);
-        const view = new DataView(wavBuffer);
-        
-        // Write WAV header
-        const writeString = (view: DataView, offset: number, string: string) => {
-          for (let i = 0; i < string.length; i++) {
-            view.setUint8(offset + i, string.charCodeAt(i));
-          }
-        };
-
-        writeString(view, 0, 'RIFF');
-        view.setUint32(4, 36 + length * 2, true);
-        writeString(view, 8, 'WAVE');
-        writeString(view, 12, 'fmt ');
-        view.setUint32(16, 16, true);
-        view.setUint16(20, 1, true);
-        view.setUint16(22, numberOfChannels, true);
-        view.setUint32(24, sampleRate, true);
-        view.setUint32(28, sampleRate * 4, true);
-        view.setUint16(32, numberOfChannels * 2, true);
-        view.setUint16(34, 16, true);
-        writeString(view, 36, 'data');
-        view.setUint32(40, length * 2, true);
-
-        const channel = audioBuffer.getChannelData(0);
-        let offset = 44;
-        for (let i = 0; i < length; i++) {
-          const sample = Math.max(-1, Math.min(1, channel[i]));
-          view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
-          offset += 2;
-        }
-
-        resolve(new Blob([wavBuffer], { type: 'audio/wav' }));
-      });
-
       console.log('Starting transcription:', {
-        originalType: audioBlob.type,
-        convertedType: 'audio/wav',
-        originalSize: formatFileSize(audioBlob.size),
-        convertedSize: formatFileSize(wavBlob.size),
-        sampleRate: audioBuffer.sampleRate,
-        channels: audioBuffer.numberOfChannels,
-        duration: audioBuffer.duration.toFixed(2) + 's',
+        originalType: audioPreview.split(':')[1].split(';')[0],
+        originalSize: formatFileSize((await (await fetch(audioPreview)).blob()).size),
         language: selectedLanguage
       });
 
-      await uploadAudioForTranscription(wavBlob, (progress) => {
-        setUploadProgress(progress);
-      }, selectedLanguage);
+      await uploadAudioForTranscription(
+        await (await fetch(audioPreview)).blob(),
+        setUploadProgress,
+        selectedLanguage
+      );
 
       await handleUploadSuccess();
 
@@ -1396,75 +1344,79 @@ export default function Home() {
                               )}
                             </div>
                           )}
-                          {filteredTranscriptions.map((item) => (
-                            <motion.div
-                              key={item.id}
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              className="p-4 bg-gray-800 rounded-lg flex flex-col gap-4 group relative hover:bg-gray-700/50 transition-colors"
-                            >
-                              <div className="flex items-center justify-between relative">
-                                <p className="text-gray-200 flex-1 pr-8 line-clamp-3">
-                                  {item.status === 'processing' ? (
-                                    <span className="text-yellow-500">Your transcription is being processed...</span>
-                                  ) : item.error ? (
-                                    <span className="text-red-500">{item.error}</span>
-                                  ) : item.text ? (
-                                    item.text
-                                  ) : (
-                                    <span className="text-red-500">Transcription not available</span>
-                                  )}
-                                </p>
-                                <div className="flex items-center gap-2">
-                                  <div className="relative flex items-center gap-2">
-                                    {item.status === 'completed' && item.text && item.text.trim() !== '' && (
-                                      <button
-                                        onClick={() => {
-                                          navigator.clipboard.writeText(item.text);
-                                          setCopiedId(item.id);
-                                          setCopySuccess(true);
-                                          setTimeout(() => {
-                                            setCopiedId(null);
-                                            setCopySuccess(false);
-                                          }, 2000);
-                                        }}
-                                        className="text-gray-400 hover:text-purple-400 transition-colors"
-                                      >
-                                        <ClipboardDocumentIcon className="h-5 w-5" />
-                                      </button>
-                                    )}
-                                    <AnimatePresence>
-                                      {copySuccess && copiedId === item.id && (
-                                        <motion.div
-                                          initial={{ opacity: 0, y: 10 }}
-                                          animate={{ opacity: 1, y: 0 }}
-                                          exit={{ opacity: 0, y: 10 }}
-                                          className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-green-500 text-white text-xs rounded whitespace-nowrap"
-                                        >
-                                          Copied!
-                                        </motion.div>
+                          <div className="space-y-4">
+                            {filteredTranscriptions.map((item) => (
+                              <motion.div
+                                key={item.id}
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                className="p-4 bg-gray-800 rounded-lg flex flex-col gap-4 group relative hover:bg-gray-700/50 transition-colors shadow-lg border border-gray-700"
+                              >
+                                <div className="flex flex-col gap-4">
+                                  <div className="relative">
+                                    <p className="text-gray-200 flex-1 pr-8 line-clamp-3">
+                                      {item.status === 'processing' ? (
+                                        <span className="text-yellow-500">Your transcription is being processed...</span>
+                                      ) : item.error ? (
+                                        <span className="text-red-500">{item.error}</span>
+                                      ) : item.text ? (
+                                        item.text
+                                      ) : (
+                                        <span className="text-red-500">Transcription not available</span>
                                       )}
-                                    </AnimatePresence>
+                                    </p>
                                   </div>
-                                  <TranscriptionStatus 
-                                    status={item.error === "Please wait, processing your audio..." ? 'processing' : item.status}
-                                    showBadge={false}
-                                  />
+                                  <div className="flex items-center justify-between text-sm text-gray-400">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span>{new Date(item.created_at).toLocaleString()}</span>
+                                      {item.language_code && (
+                                        <>
+                                          <span>•</span>
+                                          <span>{item.language_code.toUpperCase()}</span>
+                                        </>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      {item.status === 'completed' && item.text && item.text.trim() !== '' && (
+                                        <div className="relative">
+                                          <button
+                                            onClick={() => {
+                                              navigator.clipboard.writeText(item.text);
+                                              setCopiedId(item.id);
+                                              setCopySuccess(true);
+                                              setTimeout(() => {
+                                                setCopiedId(null);
+                                                setCopySuccess(false);
+                                              }, 2000);
+                                            }}
+                                            className="text-gray-400 hover:text-purple-400 transition-colors"
+                                          >
+                                            <ClipboardDocumentIcon className="h-5 h-5" />
+                                          </button>
+                                          <AnimatePresence>
+                                            {copySuccess && copiedId === item.id && (
+                                              <motion.div
+                                                initial={{ opacity: 0, y: 10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                exit={{ opacity: 0, y: 10 }}
+                                                className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-green-500 text-white text-xs rounded whitespace-nowrap"
+                                              >
+                                                Copied!
+                                              </motion.div>
+                                            )}
+                                          </AnimatePresence>
+                                        </div>
+                                      )}
+                                      <TranscriptionStatus 
+                                        status={item.error === "Please wait, processing your audio..." ? 'processing' : item.status}
+                                        showBadge={false}
+                                      />
+                                    </div>
+                                  </div>
                                 </div>
-                              </div>
-                              <div className="flex items-center justify-between text-sm text-gray-400">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span>{new Date(item.created_at).toLocaleString()}</span>
-                                  {item.language_code && (
-                                    <>
-                                      <span>•</span>
-                                      <span>{item.language_code.toUpperCase()}</span>
-                                    </>
-                                  )}
-                                </div>
-                              </div>
-                            </motion.div>
-                          ))}
+                              </motion.div>
+                            ))}
+                          </div>
                           {filteredTranscriptions.length > itemsPerPage && (
                             <div className="pb-6">
                               <Pagination
@@ -1518,30 +1470,28 @@ export default function Home() {
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           className={clsx(
-                            "p-4 bg-gray-800 rounded-lg flex flex-col group relative hover:bg-gray-700/50 transition-colors",
+                            "p-4 bg-gray-800 rounded-lg flex flex-col group relative hover:bg-gray-700/50 transition-colors shadow-lg border border-gray-700",
                             "max-h-40 overflow-hidden"
                           )}
                         >
-                          <div className="flex items-center justify-between relative">
-                            <p className="text-gray-200 flex-1 pr-8 line-clamp-3">
-                              {item.status === 'processing' ? (
-                                <span className="text-yellow-500">Your transcription is being processed...</span>
-                              ) : item.error ? (
-                                item.error === "Please wait, processing your audio..." ? (
-                                  <span className="text-yellow-500 flex items-center gap-2">
-                                    <ArrowPathIcon className="h-4 w-4 animate-spin" />
-                                    {item.error}
-                                  </span>
-                                ) : (
-                                  <span className="text-red-500">{item.error}</span>
-                                )
-                              ) : item.text ? (
-                                item.text
+                          <p className="text-gray-200 flex-1 pr-8 line-clamp-3">
+                            {item.status === 'processing' ? (
+                              <span className="text-yellow-500">Your transcription is being processed...</span>
+                            ) : item.error ? (
+                              item.error === "Please wait, processing your audio..." ? (
+                                <span className="text-yellow-500 flex items-center gap-2">
+                                  <ArrowPathIcon className="h-4 w-4 animate-spin" />
+                                  {item.error}
+                                </span>
                               ) : (
-                                <span className="text-red-500">Transcription not available</span>
-                              )}
-                            </p>
-                          </div>
+                                <span className="text-red-500">{item.error}</span>
+                              )
+                            ) : item.text ? (
+                              item.text
+                            ) : (
+                              <span className="text-red-500">Transcription not available</span>
+                            )}
+                          </p>
                           <div className="flex items-center justify-between mt-8">
                             <div className="flex items-center gap-2 text-sm text-gray-400 flex-wrap">
                               <span>{new Date(item.created_at).toLocaleString()}</span>
