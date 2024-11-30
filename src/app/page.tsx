@@ -1053,7 +1053,7 @@ export default function Home() {
                         >
                           {isLoading ? (
                             <div className="flex items-center justify-center gap-2">
-                              <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                              <ArrowPathIcon className="w-4 h-4 animate-futuristic-spin text-purple-500" />
                               <span>Processing...</span>
                             </div>
                           ) : (
@@ -1318,7 +1318,7 @@ export default function Home() {
                     >
                       {isLoadingHistory ? (
                         <div className="flex items-center justify-center h-32">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                          <div className="animate-futuristic-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
                         </div>
                       ) : (
                         <div>
@@ -1344,7 +1344,7 @@ export default function Home() {
                                 </>
                               ) : activeTab === 'processing' ? (
                                 <>
-                                  <ArrowPathIcon className="w-16 h-16 text-gray-600 mb-4 animate-spin" />
+                                  <ArrowPathIcon className="w-16 h-16 text-purple-500 mb-4 animate-futuristic-spin" />
                                   <p className="text-gray-400 text-lg font-medium">No processing transcriptions</p>
                                   <p className="text-gray-500 text-sm mt-2">All your transcriptions are either completed or queued</p>
                                 </>

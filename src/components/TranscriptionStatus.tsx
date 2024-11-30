@@ -30,16 +30,16 @@ const statusConfig: Record<string, StatusConfig> = {
   polling: {
     icon: ArrowPathIcon,
     label: 'Processing',
-    color: 'text-blue-500',
-    bgColor: 'bg-blue-100',
-    textColor: 'text-blue-700'
+    color: 'text-purple-500',
+    bgColor: 'bg-purple-100/10',
+    textColor: 'text-purple-400'
   },
   processing: {
     icon: ArrowPathIcon,
     label: 'Processing',
-    color: 'text-blue-500',
-    bgColor: 'bg-blue-100',
-    textColor: 'text-blue-700'
+    color: 'text-purple-500',
+    bgColor: 'bg-purple-100/10',
+    textColor: 'text-purple-400'
   },
   completed: {
     icon: CheckCircleIcon,
@@ -61,10 +61,14 @@ export default function TranscriptionStatus({ status, error, className, showBadg
   const Icon = statusConfig[status].icon;
   const config = statusConfig[status];
   
+  const spinAnimation = status === 'processing' || status === 'polling' 
+    ? 'animate-futuristic-spin transition-all duration-300 ease-in-out hover:text-purple-400 hover:shadow-lg hover:shadow-purple-500/20' 
+    : '';
+  
   if (showBadge) {
     return (
-      <div className={`flex items-center space-x-2 rounded-lg px-3 py-1.5 ${config.bgColor} ${className || ''}`}>
-        <Icon className={`h-5 w-5 ${config.color} ${status === 'processing' || status === 'polling' ? 'animate-spin' : ''}`} />
+      <div className={`flex items-center space-x-2 rounded-lg px-3 py-1.5 backdrop-blur-sm ${config.bgColor} ${className || ''}`}>
+        <Icon className={`h-5 w-5 ${config.color} ${spinAnimation}`} />
         <span className={`font-medium ${config.textColor}`}>{config.label}</span>
         {error && status === 'error' && (
           <span className="text-sm text-red-600 ml-2">({error})</span>
@@ -75,7 +79,7 @@ export default function TranscriptionStatus({ status, error, className, showBadg
 
   return (
     <div className={`flex items-center ${className || ''}`}>
-      <Icon className={`h-5 w-5 ${config.color} ${status === 'processing' || status === 'polling' ? 'animate-spin' : ''}`} />
+      <Icon className={`h-5 w-5 ${config.color} ${spinAnimation}`} />
       {error && status === 'error' && (
         <span className="text-sm text-red-600 ml-2">({error})</span>
       )}
