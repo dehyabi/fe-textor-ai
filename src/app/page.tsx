@@ -1372,7 +1372,13 @@ export default function Home() {
                                   <p className="text-gray-400 text-center w-full">Please wait, processing your audio...</p>
                                 ) : (
                                   <p className="text-white break-words line-clamp-3 pr-8 w-full text-center">
-                                    {item.error ? item.error : item.text}
+                                    {item.error ? (
+                                      <span className="text-red-500">{item.error}</span>
+                                    ) : item.text ? (
+                                      item.text
+                                    ) : (
+                                      <span className="text-red-500">Transcription not available</span>
+                                    )}
                                   </p>
                                 )}
                               </div>
@@ -1479,7 +1485,13 @@ export default function Home() {
                         >
                           <div className="flex items-center justify-between relative">
                             <p className="text-gray-200 flex-1 pr-8 line-clamp-3">
-                              {item.error ? item.error : item.text}
+                              {item.error ? (
+                                <span className="text-red-500">{item.error}</span>
+                              ) : item.text ? (
+                                item.text
+                              ) : (
+                                <span className="text-red-500">Transcription not available</span>
+                              )}
                             </p>
                           </div>
                           <div className="flex items-center justify-between mt-8">
