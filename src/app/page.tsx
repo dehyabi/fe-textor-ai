@@ -1316,31 +1316,31 @@ export default function Home() {
                             <div className="flex flex-col items-center justify-center h-64 text-center">
                               {activeTab === 'all' ? (
                                 <>
-                                  <EmptyDocumentTextIcon className="w-16 h-16 text-gray-600 mb-4" />
+                                  <EmptyDocumentTextIcon className="w-16 h-16 text-purple-500 mb-4" />
                                   <p className="text-gray-400 text-lg font-medium">No transcriptions yet</p>
                                   <p className="text-gray-500 text-sm mt-2">Upload or record audio to get started</p>
                                 </>
                               ) : activeTab === 'error' ? (
                                 <>
-                                  <EmptyExclamationCircleIcon className="w-16 h-16 text-gray-600 mb-4" />
+                                  <EmptyExclamationCircleIcon className="w-16 h-16 text-purple-500 mb-4" />
                                   <p className="text-gray-400 text-lg font-medium">No error transcriptions</p>
                                   <p className="text-gray-500 text-sm mt-2">All your transcriptions are processing normally</p>
                                 </>
                               ) : activeTab === 'completed' ? (
                                 <>
-                                  <EmptyCheckCircleIcon className="w-16 h-16 text-gray-600 mb-4" />
+                                  <EmptyCheckCircleIcon className="w-16 h-16 text-purple-500 mb-4" />
                                   <p className="text-gray-400 text-lg font-medium">No completed transcriptions</p>
                                   <p className="text-gray-500 text-sm mt-2">Your transcriptions are still being processed</p>
                                 </>
                               ) : activeTab === 'processing' ? (
                                 <>
-                                  <ArrowPathIcon className="w-16 h-16 text-purple-500 mb-4 animate-futuristic-spin" />
+                                  <ArrowPathIcon className="w-16 h-16 text-purple-500 mb-4" />
                                   <p className="text-gray-400 text-lg font-medium">No processing transcriptions</p>
                                   <p className="text-gray-500 text-sm mt-2">All your transcriptions are either completed or queued</p>
                                 </>
                               ) : (
                                 <>
-                                  <EmptyQueueListIcon className="w-16 h-16 text-gray-600 mb-4" />
+                                  <EmptyQueueListIcon className="w-16 h-16 text-purple-500 mb-4" />
                                   <p className="text-gray-400 text-lg font-medium">No queued transcriptions</p>
                                   <p className="text-gray-500 text-sm mt-2">All your transcriptions are being processed</p>
                                 </>
