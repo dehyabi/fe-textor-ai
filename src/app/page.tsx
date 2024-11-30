@@ -1321,7 +1321,7 @@ export default function Home() {
                           <div className="animate-futuristic-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
                         </div>
                       ) : (
-                        <div>
+                        <div className="pt-4">
                           {filteredTranscriptions.length === 0 && showEmptyMessage && (
                             <div className="flex flex-col items-center justify-center h-64 text-center">
                               {activeTab === 'all' ? (
@@ -1363,7 +1363,7 @@ export default function Home() {
                               initial={{ opacity: 0, y: 20 }}
                               animate={{ opacity: 1, y: 0 }}
                               transition={{ delay: index * 0.1 }}
-                              className="p-4 bg-gray-700/50 rounded-lg backdrop-blur-sm border border-gray-600/50 group relative"
+                              className="p-4 bg-gray-700/50 rounded-lg backdrop-blur-sm border border-gray-600/50 group relative mb-4"
                             >
                               <div className="flex items-center justify-between relative mb-6">
                                 {currentStatus === 'polling' && item === filteredTranscriptions[0] && !item.text && item.status === 'processing' ? (
