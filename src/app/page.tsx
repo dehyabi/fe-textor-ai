@@ -625,6 +625,7 @@ export default function Home() {
     if (showHistory) {
       setShowHistory(false);
       setShowPreviousTranscriptions(true);
+      loadTranscriptionHistory();
     } else {
       setShowHistory(true);
       setShowPreviousTranscriptions(false);
@@ -1304,6 +1305,7 @@ export default function Home() {
                         onClick={() => {
                           setShowHistory(false);
                           setShowPreviousTranscriptions(true);
+                          loadTranscriptionHistory();
                         }}
                         className="text-white/50 hover:text-white transition-colors"
                       >
