@@ -1557,9 +1557,11 @@ export default function Home() {
                       {showViewAllButton && (
                         <div className="flex justify-center mt-4">
                           <button
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setActiveTab('all');
                               setShowHistory(true);
+                              loadTranscriptionHistory();
                             }}
                             className="px-4 py-2 text-sm text-gray-300 hover:text-white bg-gray-700/50 hover:bg-gray-600/50 rounded-full transition-all"
                           >
