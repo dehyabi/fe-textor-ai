@@ -105,7 +105,7 @@ export default function Home() {
         itemStatus = 'processing';
       }
       // Handle error cases
-      else if (item.error || (!item.text && item.status === 'completed')) {
+      else if (item.error === "Transcription not available") {
         itemStatus = 'error';
       }
 
@@ -152,7 +152,7 @@ export default function Home() {
     Object.values(history || {}).flat().forEach((item) => {
       if (item.error === "Please wait, processing your audio...") {
         counts.processing++;
-      } else if (item.error || (!item.text && item.status === 'completed')) {
+      } else if (item.error === "Transcription not available") {
         counts.error++;
       } else if (item.status === 'completed' && item.text) {
         counts.completed++;
@@ -1183,7 +1183,6 @@ export default function Home() {
                   <div className="mt-4 space-y-4">
                     <TranscriptionStatus 
                       status={currentStatus === 'polling' ? 'polling' : currentStatus}
-                      error={error || undefined}
                       showBadge={true}
                     />
                     {uploadProgress > 0 && (
@@ -1408,8 +1407,8 @@ export default function Home() {
                                         </div>
                                       )}
                                       <TranscriptionStatus 
-                                        status={item.error === "Please wait, processing your audio..." ? 'processing' : item.status}
-                                        showBadge={false}
+                                        status={item.error === "Please wait, processing your audio..." ? 'processing' : 
+                                               !item.text ? 'error' : item.status}
                                       />
                                     </div>
                                   </div>

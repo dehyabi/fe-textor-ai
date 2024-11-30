@@ -61,6 +61,8 @@ export default function TranscriptionStatus({ status, error, className, showBadg
   let currentStatus = status;
   if (error === "Please wait, processing your audio...") {
     currentStatus = 'processing';
+  } else if (error === "Transcription not available") {
+    currentStatus = 'error';
   }
   
   const Icon = statusConfig[currentStatus].icon;
