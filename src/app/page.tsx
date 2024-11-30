@@ -1405,12 +1405,12 @@ export default function Home() {
                             >
                               <div className="flex items-center justify-between relative">
                                 <p className="text-gray-200 flex-1 pr-8 line-clamp-3">
-                                  {item.error ? (
+                                  {item.status === 'processing' ? (
+                                    <span className="text-yellow-500">Your transcription is being processed...</span>
+                                  ) : item.error ? (
                                     <span className="text-red-500">{item.error}</span>
                                   ) : item.text ? (
                                     item.text
-                                  ) : activeTab === 'processing' || item.status === 'processing' ? (
-                                    <span className="text-yellow-500">Your transcription is being processed...</span>
                                   ) : (
                                     <span className="text-red-500">Transcription not available</span>
                                   )}
@@ -1524,7 +1524,9 @@ export default function Home() {
                         >
                           <div className="flex items-center justify-between relative">
                             <p className="text-gray-200 flex-1 pr-8 line-clamp-3">
-                              {item.error ? (
+                              {item.status === 'processing' ? (
+                                <span className="text-yellow-500">Your transcription is being processed...</span>
+                              ) : item.error ? (
                                 item.error === "Please wait, processing your audio..." ? (
                                   <span className="text-yellow-500 flex items-center gap-2">
                                     <ArrowPathIcon className="h-4 w-4 animate-spin" />
