@@ -50,6 +50,7 @@ interface TranscriptionStatusProps {
   status: 'queued' | 'processing' | 'completed' | 'error';
   error?: string;
   showBadge?: boolean;
+  text?: string;
 }
 
 export default function Home() {
@@ -1197,7 +1198,8 @@ export default function Home() {
                 {isLoading && (
                   <div className="mt-4 space-y-4">
                     <TranscriptionStatus 
-                      status={currentStatus}
+                      status={currentStatus === 'polling' ? 'polling' : currentStatus}
+                      error={error || undefined}
                       showBadge={true}
                     />
                     {uploadProgress > 0 && (
@@ -1412,11 +1414,7 @@ export default function Home() {
                                     </div>
                                   </div>
                                   <TranscriptionStatus 
-                                    status={
-                                      currentStatus === 'polling' && item === filteredTranscriptions[0] && !item.text && item.status === 'processing'
-                                        ? 'processing'
-                                        : item.error ? 'error' : item.status
-                                    }
+                                    status={item.error ? 'error' : (!item.text || item.text.trim() === '') ? 'error' : item.status}
                                   />
                                 </div>
                               </div>
