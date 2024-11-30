@@ -1423,11 +1423,13 @@ export default function Home() {
                             </motion.div>
                           ))}
                           {filteredTranscriptions.length > itemsPerPage && (
-                            <Pagination
-                              currentPage={currentPage}
-                              totalPages={totalPages}
-                              onPageChange={(page) => setCurrentPage(page)}
-                            />
+                            <div className="pb-6">
+                              <Pagination
+                                currentPage={currentPage}
+                                totalPages={totalPages}
+                                onPageChange={(page) => setCurrentPage(page)}
+                              />
+                            </div>
                           )}
                         </div>
                       )}
