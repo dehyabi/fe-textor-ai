@@ -95,20 +95,13 @@ export default function Home() {
   // Filter transcriptions based on active tab
   const filteredHistory = useMemo(() => {
     if (!history) return [];
-    
-    if (activeTab === 'all') {
-      return Object.values(history).flat();
-    }
-
-    return history[activeTab] || [];
-  }, [history, activeTab]);
+    return Object.values(history).flat();
+  }, [history]);
 
   // Calculate pagination
   const filteredTranscriptions = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    const end = start + itemsPerPage;
-    return filteredHistory.slice(start, end);
-  }, [filteredHistory, currentPage]);
+    return filteredHistory;
+  }, [filteredHistory]);
 
   const hasTranscriptions = useMemo(() => {
     return filteredHistory && filteredHistory.length > 0;
@@ -215,18 +208,8 @@ export default function Home() {
       setCurrentStatus('completed');
     }
     
-    // Sync data when switching tabs
-    const response = await loadTranscriptionHistory();
-    if (response) {
-      // Only show empty message if server confirms no transcriptions for this status
-      const hasTranscriptionsForStatus = tab === 'all'
-        ? Object.values(response.transcriptions).some(arr => arr.length > 0)
-        : response.transcriptions[tab as keyof TranscriptionsByStatus]?.length > 0;
-        
-      if (!hasTranscriptionsForStatus) {
-        setTimeout(() => setShowEmptyMessage(true), 1000);
-      }
-    }
+    // Fetch first page of data for the new tab
+    await fetchHistory(1);
   };
 
   const formatFileSize = (bytes: number) => {
@@ -819,13 +802,22 @@ export default function Home() {
     try {
       setIsLoadingHistory(true);
       const response = await getTranscriptionHistory(page, itemsPerPage, activeTab);
-      setHistory(response.transcriptions);
+      
+      // Update history with the current page's data
+      setHistory({
+        queued: response.transcriptions.queued || [],
+        processing: response.transcriptions.processing || [],
+        completed: response.transcriptions.completed || [],
+        error: response.transcriptions.error || []
+      });
+      
       setStatusCounts({
         queued: response.status_counts.queued || 0,
         processing: response.status_counts.processing || 0,
         completed: response.status_counts.completed || 0,
         error: response.status_counts.error || 0
       });
+      
       setTotalPages(response.total_pages);
       setCurrentPage(response.current_page);
     } catch (error: unknown) {
@@ -1430,7 +1422,7 @@ export default function Home() {
                               </div>
                             </motion.div>
                           ))}
-                          {filteredHistory.length > itemsPerPage && (
+                          {filteredTranscriptions.length > itemsPerPage && (
                             <Pagination
                               currentPage={currentPage}
                               totalPages={totalPages}
