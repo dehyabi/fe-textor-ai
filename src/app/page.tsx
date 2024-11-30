@@ -1466,7 +1466,7 @@ export default function Home() {
                 "relative w-full",
                 Object.values(statusCountsMemo).some(count => count > 0) ? "mt-4" : "mt-0"
               )}>
-                <div className="px-4">
+                <div>
                   <div className="flex justify-between items-center mb-4 cursor-pointer"
                      onClick={() => setShowPreviousTranscriptions(!showPreviousTranscriptions)}>
                     <div className="flex-1" />
