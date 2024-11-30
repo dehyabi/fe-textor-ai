@@ -115,11 +115,11 @@ export default function LanguageSelector({ value, onChange, className = '' }: La
   }, []);
 
   return (
-    <div className={`relative w-[300px] ${className}`} ref={dropdownRef}>
+    <div className={`relative w-[250px] ${className}`} ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="px-4 py-2.5 text-center bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors"
-        style={{ width: '300px' }}
+        style={{ width: '250px' }}
       >
         {selectedLang ? (
           <span className="text-sm">{selectedLang.name} ({selectedLang.nativeName})</span>
@@ -136,7 +136,7 @@ export default function LanguageSelector({ value, onChange, className = '' }: La
           style={{ 
             position: 'absolute',
             left: 0,
-            width: '300px'
+            width: '250px'
           }}
           className="z-50 mt-2 bg-gray-800 rounded-lg shadow-lg overflow-hidden"
         >
@@ -150,7 +150,7 @@ export default function LanguageSelector({ value, onChange, className = '' }: La
             />
           </div>
 
-          <div className="max-h-[300px] overflow-y-auto">
+          <div className="max-h-[250px] overflow-y-auto">
             {filteredLanguages.map((lang) => (
               <button
                 key={lang.code}
